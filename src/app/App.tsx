@@ -16,7 +16,6 @@ import {
   X,
   ArrowLeft,
   PaperPlaneTilt,
-  Note,
   Headset,
 } from "@phosphor-icons/react";
 import "../styles/helpcenter.css";
@@ -234,9 +233,11 @@ export default function App() {
   );
   const [canvasMode, setCanvasMode] = useState(false);
   const [currentScenario, setCurrentScenario] = useState<ScenarioType | null>(null);
+  const [shareMenuOpen, setShareMenuOpen] = useState(false);
 
   const composerRef = useRef<HTMLInputElement>(null);
   const threadRef = useRef<HTMLDivElement>(null);
+  const shareMenuRef = useRef<HTMLDivElement>(null);
 
   const isFullscreenRef = useRef(isFullscreen);
   const messagesRef = useRef(messages);
@@ -313,6 +314,17 @@ export default function App() {
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [popupOpen]);
+
+  useEffect(() => {
+    if (!shareMenuOpen) return;
+    function onPointerDown(e: MouseEvent) {
+      if (shareMenuRef.current && !shareMenuRef.current.contains(e.target as Node)) {
+        setShareMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, [shareMenuOpen]);
 
   function toggleFullscreen() {
     setIsFullscreen((f) => !f);
@@ -426,6 +438,7 @@ export default function App() {
 
   function enterCanvasMode() {
     setCanvasMode(true);
+    setPopupOpen(true);
     setMessages([]);
     setThreadActive(false);
     setSelectedArticle(null);
@@ -434,14 +447,24 @@ export default function App() {
 
   function exitCanvasMode() {
     setCanvasMode(false);
+    setPopupOpen(false);
     setCurrentScenario(null);
+    setMessages([]);
+    setThreadActive(false);
+    setSelectedArticle(null);
+    setShareMenuOpen(false);
+  }
+
+  function handleScenarioChange(scenarioId: string) {
+    setCurrentScenario(scenarioId as ScenarioType);
     setMessages([]);
     setThreadActive(false);
     setSelectedArticle(null);
   }
 
-  function handleScenarioChange(scenarioId: string) {
-    setCurrentScenario(scenarioId as ScenarioType);
+  function selectScenario(scenarioId: ScenarioType) {
+    handleScenarioChange(scenarioId);
+    setShareMenuOpen(false);
   }
 
   function ask(q: string) {
@@ -571,21 +594,46 @@ export default function App() {
 
   return (
     <div className={`hc-root${canvasMode ? " is-canvas-mode" : ""}`} style={{ width: "100%", minHeight: "100dvh" }}>
-      {canvasMode && (
-        <div className="edit-navbar">
-          <span className="edit-navbar__label">Edit Mode</span>
-          <select
-            className="edit-navbar__select"
-            value={currentScenario || 'default'}
-            onChange={(e) => handleScenarioChange(e.target.value as ScenarioType)}
+      <div className="canvas-topbar">
+        <div className="canvas-topbar__toggle">
+          <button
+            className={`canvas-topbar__toggle-btn${canvasMode ? " is-active" : ""}`}
+            onClick={() => { if (!canvasMode) enterCanvasMode(); }}
           >
-            {Object.entries(SCENARIOS).map(([key, scenario]) => (
-              <option key={key} value={key}>{scenario.name}</option>
-            ))}
-          </select>
-          <button className="edit-navbar__button" onClick={exitCanvasMode}>Exit Canvas</button>
+            Edit
+          </button>
+          <button
+            className={`canvas-topbar__toggle-btn${!canvasMode ? " is-active" : ""}`}
+            onClick={() => { if (canvasMode) exitCanvasMode(); }}
+          >
+            Prototype
+          </button>
         </div>
-      )}
+        <div className="canvas-topbar__share" ref={shareMenuRef}>
+          <button
+            className="canvas-topbar__share-btn"
+            disabled={!canvasMode}
+            aria-expanded={shareMenuOpen}
+            onClick={() => setShareMenuOpen((v) => !v)}
+          >
+            {currentScenario ? SCENARIOS[currentScenario].name : "Share"}
+            <ArrowDown size={12} aria-hidden="true" />
+          </button>
+          {shareMenuOpen && canvasMode && (
+            <div className="canvas-topbar__menu">
+              {Object.entries(SCENARIOS).map(([key, scenario]) => (
+                <button
+                  key={key}
+                  className={`canvas-topbar__menu-item${currentScenario === key ? " is-selected" : ""}`}
+                  onClick={() => selectScenario(key as ScenarioType)}
+                >
+                  {scenario.name}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
       <div className="page">
         <header className="header">
           <div className="avatar" aria-hidden="true">
@@ -687,11 +735,6 @@ export default function App() {
               <button aria-label="History">
                 <ClockCounterClockwise size={16} />
               </button>
-              {!canvasMode && (
-                <button aria-label="Edit" onClick={enterCanvasMode} title="Edit mode">
-                  <Note size={16} />
-                </button>
-              )}
               <button
                 aria-label={isFullscreen ? "Exit full screen" : "Expand to full screen"}
                 aria-pressed={isFullscreen}

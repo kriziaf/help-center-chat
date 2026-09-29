@@ -165,7 +165,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  padding-top: 20px;
+  padding-top: 72px;
   padding-bottom: 20px;
   min-height: 100vh;
 }
@@ -173,57 +173,102 @@
 .hc-root.is-canvas-mode .page { display: none; }
 .hc-root.is-canvas-mode .fab { display: none; }
 
-/* Edit Navbar */
-.hc-root .edit-navbar {
+/* Persistent Canvas Topbar */
+.hc-root .canvas-topbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 52px;
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 12px;
-  padding: 12px 16px;
-  background: var(--surface-2);
-  border: 0.5px solid var(--border);
-  border-radius: var(--radius-card);
-  width: 768px;
-  margin-bottom: 12px;
-  flex-wrap: wrap;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  padding: 0 20px;
+  background: #000;
+  z-index: 50;
 }
 
-.hc-root .edit-navbar__label {
-  font-size: 12px;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
+.hc-root:not(.is-canvas-mode) {
+  padding-top: 52px;
+}
+
+.hc-root .canvas-topbar__toggle {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: rgba(255,255,255,0.08);
+  border: 0.5px solid rgba(255,255,255,0.15);
+  border-radius: 999px;
+  padding: 3px;
+}
+
+.hc-root .canvas-topbar__toggle-btn {
+  background: transparent;
+  border: none;
+  color: rgba(255,255,255,0.6);
+  font-size: 13px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  transition: all 0.15s ease;
+}
+
+.hc-root .canvas-topbar__toggle-btn.is-active {
+  background: #fff;
+  color: #111;
   font-weight: 500;
 }
 
-.hc-root .edit-navbar__select {
-  padding: 6px 10px;
+.hc-root .canvas-topbar__share {
+  position: relative;
+}
+
+.hc-root .canvas-topbar__share-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #000;
+  color: #fff;
+  border: 0.5px solid rgba(255,255,255,0.25);
+  border-radius: 999px;
+  padding: 8px 16px;
   font-size: 13px;
-  border: 0.5px solid var(--border-strong);
-  border-radius: var(--radius);
-  background: var(--surface-1);
-  cursor: pointer;
-  font-family: inherit;
-  flex: 1;
+}
+
+.hc-root .canvas-topbar__share-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.hc-root .canvas-topbar__menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  background: #000;
+  border: 0.5px solid rgba(255,255,255,0.15);
+  border-radius: 10px;
   min-width: 200px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  z-index: 60;
 }
 
-.hc-root .edit-navbar__button {
-  padding: 6px 12px;
-  font-size: 12px;
-  background: var(--surface-1);
-  border: 0.5px solid var(--border-strong);
-  border-radius: var(--radius);
-  cursor: pointer;
-  transition: all 0.15s ease;
-  margin-left: auto;
-  color: var(--text-secondary);
+.hc-root .canvas-topbar__menu-item {
+  background: transparent;
+  border: none;
+  color: #fff;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  white-space: nowrap;
 }
 
-.hc-root .edit-navbar__button:hover {
-  background: var(--fill-control);
-  border-color: var(--border-strong);
-  color: var(--text-primary);
+.hc-root .canvas-topbar__menu-item:hover,
+.hc-root .canvas-topbar__menu-item.is-selected {
+  background: rgba(255,255,255,0.12);
 }
 
 /* Canvas Mode Chat */
