@@ -732,7 +732,13 @@ export default function App() {
               <button aria-label="New chat" onClick={handleReset}>
                 <PencilSimple size={16} />
               </button>
-              <button aria-label="History">
+              <button
+                aria-label="History"
+                onClick={() => {
+                  setActiveTab("articles");
+                  setSelectedArticle(null);
+                }}
+              >
                 <ClockCounterClockwise size={16} />
               </button>
               <button
