@@ -1,8 +1,12 @@
 # Canvas Mode Testing Feature — Specification
 
-**Status**: ✅ Complete & Deployed  
+**Status**: ✅ Complete & Deployed (core) · 🚧 See v1.1 addendum for in-progress work  
 **Date**: September 29, 2026  
-**Version**: 1.0
+**Version**: 1.1
+
+### Changelog
+- **1.1** — Edit bar made persistent (always visible top bar, not gated behind the chat popover); added Test Case Annotations section (planned, not yet built)
+- **1.0** — Initial Canvas Mode release
 
 ---
 
@@ -16,7 +20,7 @@ Canvas Mode is a **testing & QA interface** for the MDLIVE Help Center Chat that
 - 📊 **Full-Width Canvas** — 768px centered chat with 120px grey margins
 - 🔄 **Thread Reset** — Fresh chat for each scenario selection
 - ⏱️ **Custom Delays** — 700ms to 2500ms per scenario
-- 🎮 **Easy Toggle** — Note button in toolbar to enter/exit edit mode
+- 🎮 **Persistent Toggle** — Always-visible top bar (Edit/Prototype toggle + scenario Share menu), reachable without opening the chat popover
 
 ---
 
@@ -24,27 +28,26 @@ Canvas Mode is a **testing & QA interface** for the MDLIVE Help Center Chat that
 
 ### 1. User Interface
 
-#### Edit Mode Entry
-- **Button**: Note icon in chat toolbar
-- **Visibility**: Only shown when NOT in canvas mode
-- **Action**: Clicking enters canvas mode with default scenario
-
-#### Edit Navbar
-- **Position**: Above chat popup when canvasMode = true
+#### Edit Mode Entry (updated in v1.1)
+- **Bar**: Persistent dark top bar, fixed full-width, always rendered — not gated behind the chat popover
+- **Visibility**: Always visible, in both normal (Prototype) and canvas (Edit) states
 - **Components**:
-  - Label: "Edit Mode" (uppercase, secondary color)
-  - Dropdown: Scenario selector (768px width, flex: 1)
-  - Button: "Exit Canvas" (right-aligned via margin-left: auto)
-- **Styling**: White background, subtle border, soft shadow
+  - **Edit / Prototype toggle** — segmented control; "Edit" activates canvas mode, "Prototype" exits it
+  - **Share button** — shows the current scenario name (or "Share" if none active yet); disabled unless in Edit mode
+- **Action**: Clicking "Edit" enters canvas mode with the default scenario and opens the chat popup automatically; clicking "Prototype" exits canvas mode and closes the popup
+
+#### Scenario Selection (updated in v1.1)
+- **Trigger**: Click the "Share" button in the persistent top bar
+- **Menu**: Dropdown listing all 6 scenarios (Scenario A–F), rendered below the Share button
+- **Behavior**: Selecting a scenario updates `currentScenario` and resets the thread (fresh chat)
+- **Closing**: Click outside the menu, or select a scenario, to close it
 
 #### Canvas View Layout
 ```
 ┌─────────────────────────────────────────────────────┐
+│  Persistent Top Bar        [Edit|Prototype] [Share ▾]│
+├─────────────────────────────────────────────────────┤
 │  Grey Margin (120px)                                │
-│  ┌──────────────────────────────────────────────┐   │
-│  │ Edit Navbar                                  │   │
-│  │ [Edit Mode] [Scenario Dropdown] [Exit]       │   │
-│  └──────────────────────────────────────────────┘   │
 │  ┌──────────────────────────────────────────────┐   │
 │  │ Chat Popup (768px width)                     │   │
 │  │ ┌────────────────────────────────────────┐   │   │
@@ -58,6 +61,8 @@ Canvas Mode is a **testing & QA interface** for the MDLIVE Help Center Chat that
 │  Grey Margin (120px)                                │
 └─────────────────────────────────────────────────────┘
 ```
+
+> The old "Edit Navbar" (label + inline `<select>` + "Exit Canvas" button, positioned above the popup only when `canvasMode` was true) has been removed and replaced by the persistent top bar above.
 
 ### 2. State Management
 
@@ -314,6 +319,29 @@ export type ScenarioType = keyof typeof SCENARIOS;
 - Node.js: 18+
 - Package Manager: npm
 - Framework: React 18 + TypeScript + Vite
+
+---
+
+## Test Case Annotations (Planned — not yet implemented)
+
+**Status**: 🚧 Parked, 2026-09-29 — scope and content not yet finalized
+
+### Problem
+Some scenarios aren't self-evident to trigger correctly from the composer alone:
+- **Scenario E (Multiple Results)** only returns 5 articles for broad-matching queries (e.g. "health") — an arbitrary query won't demonstrate the behavior.
+- **Scenario B (Error Path)** and **Scenario D (KB Load Failure)** actually trigger on *any* input (the mock ignores the query entirely), which isn't obvious without guidance.
+- **Scenario C (Slow Response)** needs a query that returns a real match so the delay is visible against a successful response, not the "no match" fallback.
+
+### Proposed Feature
+An annotation shown on the side of the canvas (next to the chat popup, visible while in Edit/canvas mode) that tells testers what action to take to trigger the currently-selected scenario correctly.
+
+### Open Questions (to resolve before implementation)
+1. **Content format** — should the annotation show a specific suggested query + expected result (e.g. "Type: 'health' → expect 5 results with '(and 4 more)' suffix"), or just a short testing-goal description (reusing/expanding the existing `description` field in `src/config/scenarios.ts`)?
+2. **Scope** — should this apply to all 6 scenarios (A–F) for consistency, or only B/C/D/E as originally requested (leaving A/F unannotated)?
+
+### Relevant Files
+- `src/config/scenarios.ts` — each `ScenarioConfig` already has `id`, `name`, `description` fields to build the annotation content from.
+- `src/app/App.tsx` — canvas layout / `.hc-root.is-canvas-mode` structure where a side annotation panel would need to be inserted alongside the chat popup.
 
 ---
 
