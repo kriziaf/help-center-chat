@@ -1,0 +1,351 @@
+{
+  "version": "1.0",
+  "schema": "MDLIVE Knowledge Base",
+  "lastUpdated": "2026-09-29",
+  "stats": {
+    "totalArticles": 24,
+    "totalQAPairs": 105,
+    "totalCategories": 8,
+    "totalUniqueTags": 35
+  },
+  "categories": [
+    {
+      "id": "general-info",
+      "name": "General Info",
+      "description": "MDLIVE service overview, setup, and account security",
+      "articles": 3
+    },
+    {
+      "id": "womens-health",
+      "name": "Women's Health",
+      "description": "Women's health services, prescriptions, and preventive care",
+      "articles": 3
+    },
+    {
+      "id": "mens-health",
+      "name": "Men's Health",
+      "description": "Men's health services, sexual wellness, and prescriptions",
+      "articles": 3
+    },
+    {
+      "id": "dermatology",
+      "name": "Dermatology",
+      "description": "Skin care services including acne, fungal infections, and chronic conditions",
+      "articles": 4
+    },
+    {
+      "id": "mental-health",
+      "name": "Mental Health",
+      "description": "Mental health therapy, psychiatry, and appointments",
+      "articles": 2
+    },
+    {
+      "id": "pediatric-care",
+      "name": "Pediatric Care",
+      "description": "Children's health services including vaccines, allergies, and behavioral health",
+      "articles": 5
+    },
+    {
+      "id": "prescriptions",
+      "name": "Prescriptions",
+      "description": "Prescription medications and antibiotic information",
+      "articles": 1
+    },
+    {
+      "id": "insurance",
+      "name": "Insurance",
+      "description": "Insurance coverage, HSA/FSA, and payment options",
+      "articles": 3
+    }
+  ],
+  "articles": [
+    {
+      "id": "general-info__service-basics",
+      "title": "MDLIVE Service Basics",
+      "category": "general-info",
+      "filename": "mdlive-service-basics.md",
+      "qaPairs": 6,
+      "tags": ["24-7-telehealth", "service-overview", "board-certified-doctors"],
+      "source": "mdlive-services-overview-guide.md"
+    },
+    {
+      "id": "general-info__access-setup",
+      "title": "MDLIVE Access & Setup",
+      "category": "general-info",
+      "filename": "mdlive-access-setup.md",
+      "qaPairs": 3,
+      "tags": ["mobile-access", "system-requirements", "accessibility-features"],
+      "source": "mdlive-services-overview-guide.md"
+    },
+    {
+      "id": "general-info__account-security",
+      "title": "Account Security & Privacy",
+      "category": "general-info",
+      "filename": "mdlive-account-security.md",
+      "qaPairs": 3,
+      "tags": ["hipaa-compliant", "data-privacy", "secure-login"],
+      "source": "mdlive-services-overview-guide.md"
+    },
+    {
+      "id": "womens-health__overview",
+      "title": "Women's Health Overview & Care Options",
+      "category": "womens-health",
+      "filename": "womens-health-overview.md",
+      "qaPairs": 8,
+      "tags": ["flexible-appointments", "board-certified-care", "age-restrictions", "prescription-ordering"],
+      "source": "mdlive-womens-health-care-guide.md"
+    },
+    {
+      "id": "womens-health__prescriptions",
+      "title": "Women's Health Prescriptions & Birth Control",
+      "category": "womens-health",
+      "filename": "womens-health-prescriptions.md",
+      "qaPairs": 3,
+      "tags": ["prescription-ordering", "birth-control-pills", "weight-management"],
+      "source": "mdlive-womens-health-care-guide.md"
+    },
+    {
+      "id": "womens-health__screening-prevention",
+      "title": "Women's Health Screening & Prevention",
+      "category": "womens-health",
+      "filename": "womens-health-screening-prevention.md",
+      "qaPairs": 6,
+      "tags": ["preventive-screening", "mammogram-ordering", "follow-up-care"],
+      "source": "mdlive-womens-health-care-guide.md"
+    },
+    {
+      "id": "mens-health__overview",
+      "title": "Men's Health Overview",
+      "category": "mens-health",
+      "filename": "mens-health-overview.md",
+      "qaPairs": 6,
+      "tags": ["erectile-dysfunction", "board-certified-care", "flexible-appointments"],
+      "source": "mdlive-mens-health-care-guide.md"
+    },
+    {
+      "id": "mens-health__sexual-wellness",
+      "title": "Men's Health Sexual Wellness",
+      "category": "mens-health",
+      "filename": "mens-health-sexual-wellness.md",
+      "qaPairs": 5,
+      "tags": ["erectile-dysfunction", "confidential-care", "prescription-options"],
+      "source": "mdlive-mens-health-care-guide.md"
+    },
+    {
+      "id": "mens-health__prescriptions",
+      "title": "Men's Health Prescriptions",
+      "category": "mens-health",
+      "filename": "mens-health-prescriptions.md",
+      "qaPairs": 5,
+      "tags": ["prescription-ordering", "hair-loss-treatment", "testosterone-therapy"],
+      "source": "mdlive-mens-health-care-guide.md"
+    },
+    {
+      "id": "dermatology__basics",
+      "title": "Dermatology Basics",
+      "category": "dermatology",
+      "filename": "dermatology-basics.md",
+      "qaPairs": 5,
+      "tags": ["photo-submission", "24-7-consultation", "board-certified-dermatologist"],
+      "source": "mdlive-dermatology-care-guide.md"
+    },
+    {
+      "id": "dermatology__acne-treatment",
+      "title": "Dermatology Acne Treatment",
+      "category": "dermatology",
+      "filename": "dermatology-acne-treatment.md",
+      "qaPairs": 6,
+      "tags": ["acne-management", "photo-submission", "prescription-treatment"],
+      "source": "mdlive-dermatology-care-guide.md"
+    },
+    {
+      "id": "dermatology__eczema-psoriasis",
+      "title": "Dermatology Eczema & Psoriasis",
+      "category": "dermatology",
+      "filename": "dermatology-eczema-psoriasis.md",
+      "qaPairs": 6,
+      "tags": ["chronic-skin-conditions", "photo-submission", "topical-treatment"],
+      "source": "mdlive-dermatology-care-guide.md"
+    },
+    {
+      "id": "dermatology__warts-fungal",
+      "title": "Dermatology Warts & Fungal Infections",
+      "category": "dermatology",
+      "filename": "dermatology-warts-fungal.md",
+      "qaPairs": 6,
+      "tags": ["fungal-infections", "wart-removal", "photo-submission"],
+      "source": "mdlive-dermatology-care-guide.md"
+    },
+    {
+      "id": "mental-health__appointments",
+      "title": "Mental Health Appointments & Provider Selection",
+      "category": "mental-health",
+      "filename": "mental-health-appointments.md",
+      "qaPairs": 4,
+      "tags": ["therapist-vs-psychiatrist", "flexible-scheduling", "provider-selection"],
+      "source": "mdlive-mental-health-services-guide.md"
+    },
+    {
+      "id": "mental-health__therapy-basics",
+      "title": "Mental Health Therapy Basics",
+      "category": "mental-health",
+      "filename": "mental-health-therapy-basics.md",
+      "qaPairs": 6,
+      "tags": ["therapy-expectations", "therapy-costs", "medication-psychiatry"],
+      "source": "mdlive-mental-health-services-guide.md"
+    },
+    {
+      "id": "pediatric-care__overview",
+      "title": "Pediatric Care Overview",
+      "category": "pediatric-care",
+      "filename": "pediatric-care-overview.md",
+      "qaPairs": 6,
+      "tags": ["pediatrician-availability", "age-eligibility", "common-conditions"],
+      "source": "mdlive-pediatric-care-guide.md"
+    },
+    {
+      "id": "pediatric-care__common-conditions",
+      "title": "Pediatric Care Common Conditions",
+      "category": "pediatric-care",
+      "filename": "pediatric-care-common-conditions.md",
+      "qaPairs": 6,
+      "tags": ["pediatrician-availability", "common-conditions", "age-eligibility"],
+      "source": "mdlive-pediatric-care-guide.md"
+    },
+    {
+      "id": "pediatric-care__vaccines-wellness",
+      "title": "Pediatric Care Vaccines & Wellness",
+      "category": "pediatric-care",
+      "filename": "pediatric-care-vaccines-wellness.md",
+      "qaPairs": 6,
+      "tags": ["vaccination-schedule", "preventive-care", "wellness-visit"],
+      "source": "mdlive-pediatric-care-guide.md"
+    },
+    {
+      "id": "pediatric-care__allergy-asthma",
+      "title": "Pediatric Care Allergies & Asthma",
+      "category": "pediatric-care",
+      "filename": "pediatric-care-allergy-asthma.md",
+      "qaPairs": 6,
+      "tags": ["allergy-management", "asthma-treatment", "pediatrician-availability"],
+      "source": "mdlive-pediatric-care-guide.md"
+    },
+    {
+      "id": "pediatric-care__behavioral-mental-health",
+      "title": "Pediatric Care Behavioral & Mental Health",
+      "category": "pediatric-care",
+      "filename": "pediatric-care-behavioral-mental-health.md",
+      "qaPairs": 6,
+      "tags": ["behavioral-health", "mental-health-support", "anxiety-ADHD"],
+      "source": "mdlive-pediatric-care-guide.md"
+    },
+    {
+      "id": "prescriptions__antibiotics-antifungals",
+      "title": "Prescriptions & Antibiotics",
+      "category": "prescriptions",
+      "filename": "prescriptions-antibiotics-antifungals.md",
+      "qaPairs": 6,
+      "tags": ["antibiotic-usage", "viral-vs-bacterial", "prescription-standards"],
+      "source": "mdlive-prescriptions-antibiotics-guide.md"
+    },
+    {
+      "id": "insurance__coverage-basics",
+      "title": "Insurance Coverage Basics",
+      "category": "insurance",
+      "filename": "insurance-coverage-basics.md",
+      "qaPairs": 6,
+      "tags": ["insurance-coverage", "cost-estimates", "payment-options"],
+      "source": "mdlive-insurance-coverage-guide.md"
+    },
+    {
+      "id": "insurance__hsa-fsa",
+      "title": "Insurance HSA & FSA",
+      "category": "insurance",
+      "filename": "insurance-hsa-fsa.md",
+      "qaPairs": 6,
+      "tags": ["hsa-eligible", "fsa-eligible", "payment-options"],
+      "source": "mdlive-insurance-coverage-guide.md"
+    },
+    {
+      "id": "insurance__medicaid-medicare",
+      "title": "Insurance Medicaid & Medicare",
+      "category": "insurance",
+      "filename": "insurance-medicaid-medicare.md",
+      "qaPairs": 6,
+      "tags": ["medicaid-coverage", "medicare-coverage", "government-insurance"],
+      "source": "mdlive-insurance-coverage-guide.md"
+    }
+  ],
+  "tags": [
+    "24-7-telehealth",
+    "accessibility-features",
+    "account-security",
+    "age-eligibility",
+    "age-restrictions",
+    "allergy-management",
+    "antibiotic-usage",
+    "anxiety-ADHD",
+    "asthma-treatment",
+    "behavioral-health",
+    "birth-control-pills",
+    "board-certified-care",
+    "board-certified-dermatologist",
+    "board-certified-doctors",
+    "chronic-skin-conditions",
+    "common-conditions",
+    "confidential-care",
+    "cost-estimates",
+    "data-privacy",
+    "erectile-dysfunction",
+    "flexible-appointments",
+    "flexible-scheduling",
+    "follow-up-care",
+    "fsa-eligible",
+    "fungal-infections",
+    "government-insurance",
+    "hair-loss-treatment",
+    "hipaa-compliant",
+    "hsa-eligible",
+    "insurance-coverage",
+    "medicaid-coverage",
+    "medication-psychiatry",
+    "medicare-coverage",
+    "mental-health-support",
+    "mobile-access",
+    "payment-options",
+    "pediatrician-availability",
+    "photo-submission",
+    "prescription-options",
+    "prescription-ordering",
+    "prescription-standards",
+    "prescription-treatment",
+    "preventive-care",
+    "preventive-screening",
+    "provider-selection",
+    "secure-login",
+    "service-overview",
+    "system-requirements",
+    "testosterone-therapy",
+    "therapist-vs-psychiatrist",
+    "therapy-costs",
+    "therapy-expectations",
+    "topical-treatment",
+    "vaccination-schedule",
+    "viral-vs-bacterial",
+    "wart-removal",
+    "weight-management",
+    "wellness-visit"
+  ],
+  "utilityFunctions": {
+    "getArticles": {
+      "description": "Retrieve articles by category and/or tags",
+      "signature": "getArticles(kb, category, tags) -> Article[]",
+      "example": "getArticles(KB, 'womens-health', ['flexible-appointments', 'board-certified-care'])"
+    },
+    "retrieveForQuestion": {
+      "description": "Retrieve articles using keyword matching",
+      "signature": "retrieveForQuestion(kb, question) -> Article[]",
+      "example": "retrieveForQuestion(KB, 'What medications can I get for mental health?')"
+    }
+  }
+}
