@@ -225,17 +225,14 @@ export default function App() {
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const [activeTab, setActiveTab] = useState<"conversation" | "articles">("conversation");
   const [isLoading, setIsLoading] = useState(true);
-<<<<<<< HEAD
   const [recentSearches, setRecentSearches] = useState<string[]>(() =>
     loadFromStorage(RECENT_SEARCHES_KEY, [])
   );
   const [savedConversations, setSavedConversations] = useState<SavedConversation[]>(() =>
     loadFromStorage(SAVED_CONVERSATIONS_KEY, [])
   );
-=======
   const [canvasMode, setCanvasMode] = useState(false);
   const [currentScenario, setCurrentScenario] = useState<ScenarioType | null>(null);
->>>>>>> 499c827 (feat: add canvas mode with scenario testing feature)
 
   const composerRef = useRef<HTMLInputElement>(null);
   const threadRef = useRef<HTMLDivElement>(null);
@@ -484,7 +481,6 @@ export default function App() {
       let botMsg: Message;
 
       if (results.length > 0) {
-<<<<<<< HEAD
         const categoryScores = new Map<string, number>();
         results.forEach((a, i) => {
           categoryScores.set(a.category, (categoryScores.get(a.category) ?? 0) + (results.length - i));
@@ -493,10 +489,6 @@ export default function App() {
           (a, b) => (categoryScores.get(b) ?? 0) - (categoryScores.get(a) ?? 0)
         );
 
-        botMsg = {
-          who: "bot",
-          text: "This could relate to a few areas. Which topic fits best?",
-=======
         // For multiple results scenario, show all 5 results
         const displayArticles = canvasMode && currentScenario === "multiple" ? results : [results[0]];
         const topArticle = displayArticles[0];
@@ -505,7 +497,6 @@ export default function App() {
         botMsg = {
           who: "bot",
           text: `I found "${topArticle.title}" which might help.${suffix} Would you like to read more?`,
->>>>>>> 499c827 (feat: add canvas mode with scenario testing feature)
           id: msgId++,
           chips: relevantCategories.map((catId) => ({
             key: catId,
