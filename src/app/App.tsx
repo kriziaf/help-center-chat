@@ -16,10 +16,10 @@ import {
   X,
   ArrowLeft,
   PaperPlaneTilt,
-  Headset,
-  FileText,
+  Note,
 } from "@phosphor-icons/react";
 import "../styles/helpcenter.css";
+import { SCENARIOS, type ScenarioType } from "../config/scenarios";
 
 interface Article {
   id: string;
@@ -225,12 +225,17 @@ export default function App() {
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const [activeTab, setActiveTab] = useState<"conversation" | "articles">("conversation");
   const [isLoading, setIsLoading] = useState(true);
+<<<<<<< HEAD
   const [recentSearches, setRecentSearches] = useState<string[]>(() =>
     loadFromStorage(RECENT_SEARCHES_KEY, [])
   );
   const [savedConversations, setSavedConversations] = useState<SavedConversation[]>(() =>
     loadFromStorage(SAVED_CONVERSATIONS_KEY, [])
   );
+=======
+  const [canvasMode, setCanvasMode] = useState(false);
+  const [currentScenario, setCurrentScenario] = useState<ScenarioType | null>(null);
+>>>>>>> 499c827 (feat: add canvas mode with scenario testing feature)
 
   const composerRef = useRef<HTMLInputElement>(null);
   const threadRef = useRef<HTMLDivElement>(null);
@@ -421,8 +426,34 @@ export default function App() {
     }, 500);
   }
 
+  function enterCanvasMode() {
+    setCanvasMode(true);
+    setMessages([]);
+    setThreadActive(false);
+    setSelectedArticle(null);
+    setCurrentScenario("default");
+  }
+
+  function exitCanvasMode() {
+    setCanvasMode(false);
+    setCurrentScenario(null);
+    setMessages([]);
+    setThreadActive(false);
+    setSelectedArticle(null);
+  }
+
+  function handleScenarioChange(scenarioId: string) {
+    setCurrentScenario(scenarioId as ScenarioType);
+  }
+
   function ask(q: string) {
     if (!q || !q.trim()) return;
+
+    // If in canvas mode, reset thread for fresh scenario testing
+    if (canvasMode) {
+      setMessages([]);
+    }
+
     setThreadActive(true);
     setActiveTab("conversation");
     recordSearch(q.trim());
@@ -430,11 +461,30 @@ export default function App() {
     const typingMsg: Message = { who: "typing", text: "...", id: msgId++ };
     setMessages((prev) => [...prev, userMsg, typingMsg]);
 
+    // Determine delay and search function based on scenario
+    let delay = 700;
+    let results: Article[] = [];
+    let kbAvailable = true;
+
+    if (canvasMode && currentScenario) {
+      const scenario = SCENARIOS[currentScenario];
+      delay = scenario.delay;
+      kbAvailable = scenario.kbAvailable;
+
+      if (!kbAvailable) {
+        results = [];
+      } else {
+        results = scenario.searchMock(q, articles);
+      }
+    } else {
+      results = searchArticles(articles, q);
+    }
+
     setTimeout(() => {
-      const results = searchArticles(articles, q);
       let botMsg: Message;
 
       if (results.length > 0) {
+<<<<<<< HEAD
         const categoryScores = new Map<string, number>();
         results.forEach((a, i) => {
           categoryScores.set(a.category, (categoryScores.get(a.category) ?? 0) + (results.length - i));
@@ -446,12 +496,28 @@ export default function App() {
         botMsg = {
           who: "bot",
           text: "This could relate to a few areas. Which topic fits best?",
+=======
+        // For multiple results scenario, show all 5 results
+        const displayArticles = canvasMode && currentScenario === "multiple" ? results : [results[0]];
+        const topArticle = displayArticles[0];
+        const suffix = displayArticles.length > 1 ? ` (and ${displayArticles.length - 1} more)` : "";
+
+        botMsg = {
+          who: "bot",
+          text: `I found "${topArticle.title}" which might help.${suffix} Would you like to read more?`,
+>>>>>>> 499c827 (feat: add canvas mode with scenario testing feature)
           id: msgId++,
           chips: relevantCategories.map((catId) => ({
             key: catId,
             label: CATEGORIES.find((c) => c.id === catId)?.name ?? catId,
             onClick: () => selectCategoryChip(catId),
           })),
+        };
+      } else if (!kbAvailable) {
+        botMsg = {
+          who: "bot",
+          text: "⚠️ System Error: Knowledge base is currently unavailable. Please try again later.",
+          id: msgId++,
         };
       } else {
         botMsg = {
@@ -462,7 +528,7 @@ export default function App() {
       }
 
       setMessages((prev) => prev.filter((m) => m.who !== "typing").concat(botMsg));
-    }, 700);
+    }, delay);
   }
 
   function handleSend() {
@@ -512,7 +578,22 @@ export default function App() {
   }
 
   return (
-    <div className="hc-root" style={{ width: "100%", minHeight: "100dvh" }}>
+    <div className={`hc-root${canvasMode ? " is-canvas-mode" : ""}`} style={{ width: "100%", minHeight: "100dvh" }}>
+      {canvasMode && (
+        <div className="edit-navbar">
+          <span className="edit-navbar__label">Edit Mode</span>
+          <select
+            className="edit-navbar__select"
+            value={currentScenario || 'default'}
+            onChange={(e) => handleScenarioChange(e.target.value as ScenarioType)}
+          >
+            {Object.entries(SCENARIOS).map(([key, scenario]) => (
+              <option key={key} value={key}>{scenario.name}</option>
+            ))}
+          </select>
+          <button className="edit-navbar__button" onClick={exitCanvasMode}>Exit Canvas</button>
+        </div>
+      )}
       <div className="page">
         <header className="header">
           <div className="avatar" aria-hidden="true">
@@ -600,7 +681,7 @@ export default function App() {
       )}
 
       {popupOpen && (
-        <div className={`chat-popup${isFullscreen ? " is-fullscreen" : ""}`} id="chat-popup" role="dialog" aria-label="Support assistant">
+        <div className={`chat-popup${isFullscreen ? " is-fullscreen" : ""}${canvasMode ? " is-canvas-mode" : ""}`} id="chat-popup" role="dialog" aria-label="Support assistant">
           <div className="chat-popup__toolbar">
             {threadActive && (
               <button className="chat-popup__back" aria-label="Back to main menu" onClick={handleBack}>
@@ -614,6 +695,11 @@ export default function App() {
               <button aria-label="History">
                 <ClockCounterClockwise size={16} />
               </button>
+              {!canvasMode && (
+                <button aria-label="Edit" onClick={enterCanvasMode} title="Edit mode">
+                  <Note size={16} />
+                </button>
+              )}
               <button
                 aria-label={isFullscreen ? "Exit full screen" : "Expand to full screen"}
                 aria-pressed={isFullscreen}
