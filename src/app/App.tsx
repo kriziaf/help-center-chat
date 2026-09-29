@@ -17,6 +17,7 @@ import {
   ArrowLeft,
   PaperPlaneTilt,
   Note,
+  Headset,
 } from "@phosphor-icons/react";
 import "../styles/helpcenter.css";
 import { SCENARIOS, type ScenarioType } from "../config/scenarios";
