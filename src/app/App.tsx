@@ -16,6 +16,8 @@ import {
   X,
   ArrowLeft,
   PaperPlaneTilt,
+  Headset,
+  FileText,
 } from "@phosphor-icons/react";
 import "../styles/helpcenter.css";
 
@@ -35,7 +37,23 @@ interface Category {
   description: string;
 }
 
-type Message = { who: "user" | "bot" | "typing"; text: string; id: number; article?: Article };
+interface SavedConversation {
+  id: string;
+  title: string;
+  subtitle: string;
+  timestamp: number;
+  articleId: string;
+}
+
+type ChipOption = { key: string; label: string; onClick: () => void };
+
+type Message = {
+  who: "user" | "bot" | "typing";
+  text: string;
+  id: number;
+  article?: Article;
+  chips?: ChipOption[];
+};
 
 let msgId = 0;
 
@@ -50,6 +68,9 @@ const CATEGORIES: Category[] = [
   { id: "insurance", name: "Insurance", description: "Coverage & billing" },
 ];
 
+const RECENT_SEARCHES_KEY = "hc_recent_searches";
+const SAVED_CONVERSATIONS_KEY = "hc_saved_conversations";
+
 function setRoute(name: "home" | "conversation", fullscreen: boolean) {
   if (!fullscreen) return;
   const target = "#/" + name;
@@ -60,6 +81,39 @@ function setRoute(name: "home" | "conversation", fullscreen: boolean) {
 function clearRoute() {
   if (!window.location.hash) return;
   history.replaceState(null, "", window.location.pathname + window.location.search);
+}
+
+function loadFromStorage<T>(key: string, fallback: T): T {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function formatTimestamp(ts: number): string {
+  return new Date(ts).toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+// Short preview of article content for card previews
+function excerpt(content: string, len = 100): string {
+  const clean = content
+    .replace(/^#.+$/gm, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return clean.length > len ? clean.slice(0, len).trim() + "…" : clean;
+}
+
+function readTime(content: string): number {
+  const words = content.trim().split(/\s+/).filter(Boolean).length;
+  return Math.max(1, Math.round(words / 200));
 }
 
 // Parse frontmatter from markdown
@@ -160,15 +214,6 @@ function searchArticles(articles: Article[], query: string): Article[] {
     .map((s) => s.article);
 }
 
-// Get unique tags
-function getAllTags(articles: Article[]): string[] {
-  const tagSet = new Set<string>();
-  articles.forEach((a) => {
-    a.tags.forEach((tag) => tagSet.add(tag));
-  });
-  return Array.from(tagSet).sort();
-}
-
 export default function App() {
   const [popupOpen, setPopupOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -177,12 +222,15 @@ export default function App() {
   const [input, setInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [articles, setArticles] = useState<Article[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
-  const [allTags, setAllTags] = useState<string[]>([]);
-  const [displayedArticles, setDisplayedArticles] = useState<Article[]>([]);
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
+  const [activeTab, setActiveTab] = useState<"conversation" | "articles">("conversation");
   const [isLoading, setIsLoading] = useState(true);
+  const [recentSearches, setRecentSearches] = useState<string[]>(() =>
+    loadFromStorage(RECENT_SEARCHES_KEY, [])
+  );
+  const [savedConversations, setSavedConversations] = useState<SavedConversation[]>(() =>
+    loadFromStorage(SAVED_CONVERSATIONS_KEY, [])
+  );
 
   const composerRef = useRef<HTMLInputElement>(null);
   const threadRef = useRef<HTMLDivElement>(null);
@@ -198,8 +246,6 @@ export default function App() {
     loadArticles()
       .then((loadedArticles) => {
         setArticles(loadedArticles);
-        setAllTags(getAllTags(loadedArticles));
-        setDisplayedArticles(loadedArticles.slice(0, 6)); // Show first 6
         setIsLoading(false);
       })
       .catch((error) => {
@@ -207,21 +253,6 @@ export default function App() {
         setIsLoading(false);
       });
   }, []);
-
-  // Filter articles when category or tags change
-  useEffect(() => {
-    let filtered = articles;
-
-    if (selectedCategory) {
-      filtered = filtered.filter((a) => a.category === selectedCategory);
-    }
-
-    if (selectedTags.size > 0) {
-      filtered = filtered.filter((a) => a.tags.some((t) => selectedTags.has(t)));
-    }
-
-    setDisplayedArticles(filtered);
-  }, [selectedCategory, selectedTags, articles]);
 
   useEffect(() => {
     if (popupOpen) composerRef.current?.focus();
@@ -284,19 +315,117 @@ export default function App() {
     setIsFullscreen((f) => !f);
   }
 
-  function toggleTag(tag: string) {
-    const newTags = new Set(selectedTags);
-    if (newTags.has(tag)) {
-      newTags.delete(tag);
-    } else {
-      newTags.add(tag);
-    }
-    setSelectedTags(newTags);
+  function recordSearch(q: string) {
+    setRecentSearches((prev) => {
+      const next = [q, ...prev.filter((s) => s.toLowerCase() !== q.toLowerCase())].slice(0, 8);
+      localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(next));
+      return next;
+    });
+  }
+
+  function recordSavedConversation(article: Article) {
+    const categoryName = CATEGORIES.find((c) => c.id === article.category)?.name ?? article.category;
+    setSavedConversations((prev) => {
+      const next = [
+        {
+          id: `${Date.now()}-${article.id}`,
+          title: article.title,
+          subtitle: `${categoryName} · MDLIVE`,
+          timestamp: Date.now(),
+          articleId: article.id,
+        },
+        ...prev.filter((c) => c.articleId !== article.id),
+      ].slice(0, 8);
+      localStorage.setItem(SAVED_CONVERSATIONS_KEY, JSON.stringify(next));
+      return next;
+    });
+  }
+
+  // Show a category's articles as chips, continuing the current thread
+  function showCategoryArticles(categoryId: string, userLabel: string) {
+    setThreadActive(true);
+    setActiveTab("conversation");
+    const userMsg: Message = { who: "user", text: userLabel, id: msgId++ };
+    const typingMsg: Message = { who: "typing", text: "...", id: msgId++ };
+    setMessages((prev) => [...prev, userMsg, typingMsg]);
+
+    setTimeout(() => {
+      const categoryArticles = articles.filter((a) => a.category === categoryId);
+      const categoryName = CATEGORIES.find((c) => c.id === categoryId)?.name ?? categoryId;
+      const botMsg: Message = {
+        who: "bot",
+        text: `Here are our ${categoryName} topics. Which one fits best?`,
+        id: msgId++,
+        chips: categoryArticles.map((a) => ({
+          key: a.id,
+          label: a.title,
+          onClick: () => selectSubtopic(a),
+        })),
+      };
+      setMessages((prev) => prev.filter((m) => m.who !== "typing").concat(botMsg));
+    }, 500);
+  }
+
+  function selectCategoryChip(categoryId: string) {
+    const categoryName = CATEGORIES.find((c) => c.id === categoryId)?.name ?? categoryId;
+    showCategoryArticles(categoryId, categoryName);
+  }
+
+  // User picked a specific article chip — confirm, then show the article as a rich card
+  function selectSubtopic(article: Article) {
+    const userMsg: Message = { who: "user", text: article.title, id: msgId++ };
+    const typingMsg: Message = { who: "typing", text: "...", id: msgId++ };
+    setMessages((prev) => [...prev, userMsg, typingMsg]);
+
+    setTimeout(() => {
+      const introMsg: Message = { who: "bot", text: "Ok, I think this article might help.", id: msgId++ };
+      const sourceMsg: Message = {
+        who: "bot",
+        text: "Here's a relevant article from MDLIVE.",
+        id: msgId++,
+      };
+      const cardMsg: Message = { who: "bot", text: "", id: msgId++, article };
+      const nextStepsMsg: Message = {
+        who: "bot",
+        text: "What would you like to do next?",
+        id: msgId++,
+        chips: [
+          { key: "learn-more", label: "Learn about other services", onClick: handleLearnMore },
+          { key: "reset", label: "Back to main menu", onClick: handleReset },
+        ],
+      };
+      setMessages((prev) =>
+        prev.filter((m) => m.who !== "typing").concat(introMsg, sourceMsg, cardMsg, nextStepsMsg)
+      );
+      recordSavedConversation(article);
+    }, 600);
+  }
+
+  function handleLearnMore() {
+    const userMsg: Message = { who: "user", text: "Learn about other services", id: msgId++ };
+    const typingMsg: Message = { who: "typing", text: "...", id: msgId++ };
+    setMessages((prev) => [...prev, userMsg, typingMsg]);
+
+    setTimeout(() => {
+      const botMsg: Message = {
+        who: "bot",
+        text: "Sure — which area would you like to explore?",
+        id: msgId++,
+        chips: CATEGORIES.map((c) => ({
+          key: c.id,
+          label: c.name,
+          onClick: () => selectCategoryChip(c.id),
+        })),
+      };
+      setMessages((prev) => prev.filter((m) => m.who !== "typing").concat(botMsg));
+    }, 500);
   }
 
   function ask(q: string) {
     if (!q || !q.trim()) return;
     setThreadActive(true);
+    setActiveTab("conversation");
+    recordSearch(q.trim());
     const userMsg: Message = { who: "user", text: q, id: msgId++ };
     const typingMsg: Message = { who: "typing", text: "...", id: msgId++ };
     setMessages((prev) => [...prev, userMsg, typingMsg]);
@@ -306,12 +435,23 @@ export default function App() {
       let botMsg: Message;
 
       if (results.length > 0) {
-        const topArticle = results[0];
+        const categoryScores = new Map<string, number>();
+        results.forEach((a, i) => {
+          categoryScores.set(a.category, (categoryScores.get(a.category) ?? 0) + (results.length - i));
+        });
+        const relevantCategories = Array.from(categoryScores.keys()).sort(
+          (a, b) => (categoryScores.get(b) ?? 0) - (categoryScores.get(a) ?? 0)
+        );
+
         botMsg = {
           who: "bot",
-          text: `I found "${topArticle.title}" which might help. Would you like to read more?`,
+          text: "This could relate to a few areas. Which topic fits best?",
           id: msgId++,
-          article: topArticle,
+          chips: relevantCategories.map((catId) => ({
+            key: catId,
+            label: CATEGORIES.find((c) => c.id === catId)?.name ?? catId,
+            onClick: () => selectCategoryChip(catId),
+          })),
         };
       } else {
         botMsg = {
@@ -340,12 +480,14 @@ export default function App() {
   function handleBack() {
     setThreadActive(false);
     setSelectedArticle(null);
+    setActiveTab("conversation");
   }
 
   function handleReset() {
     setMessages([]);
     setThreadActive(false);
     setSelectedArticle(null);
+    setActiveTab("conversation");
   }
 
   function handleClose() {
@@ -353,12 +495,21 @@ export default function App() {
     setIsFullscreen(false);
   }
 
-  function selectArticleFromMessage(article: Article) {
+  function openArticle(article: Article) {
     setSelectedArticle(article);
+    setActiveTab("articles");
   }
 
-  // Popular topics for suggestions (first 3 articles)
-  const suggestedArticles = articles.slice(0, 3);
+  function askMDLive() {
+    setThreadActive(true);
+    setActiveTab("conversation");
+    setTimeout(() => composerRef.current?.focus(), 0);
+  }
+
+  function openCategoryChat(categoryId: string, label: string) {
+    setPopupOpen(true);
+    showCategoryArticles(categoryId, label);
+  }
 
   return (
     <div className="hc-root" style={{ width: "100%", minHeight: "100dvh" }}>
@@ -414,10 +565,7 @@ export default function App() {
                   <button
                     key={cat.id}
                     className="topic-card"
-                    onClick={() => {
-                      setSelectedCategory(selectedCategory === cat.id ? null : cat.id);
-                      setPopupOpen(true);
-                    }}
+                    onClick={() => openCategoryChat(cat.id, cat.name)}
                   >
                     <div className="topic-card__image" aria-hidden="true">
                       {cat.id === "general-info" && <IdentificationBadge size={28} />}
@@ -454,7 +602,7 @@ export default function App() {
       {popupOpen && (
         <div className={`chat-popup${isFullscreen ? " is-fullscreen" : ""}`} id="chat-popup" role="dialog" aria-label="Support assistant">
           <div className="chat-popup__toolbar">
-            {(threadActive || selectedArticle) && (
+            {threadActive && (
               <button className="chat-popup__back" aria-label="Back to main menu" onClick={handleBack}>
                 <ArrowLeft size={16} aria-hidden="true" />
               </button>
@@ -479,78 +627,54 @@ export default function App() {
             </div>
           </div>
 
-          {selectedArticle && (
-            <div className="chat-popup__greeting">
-              <div className="article-viewer">
-                <h3>{selectedArticle.title}</h3>
-                <div className="article-content">
-                  {selectedArticle.content.split("\n").map((line, i) => (
-                    <p key={i}>{line}</p>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
+          <div className="chat-tabs" role="tablist">
+            <button
+              role="tab"
+              aria-selected={activeTab === "conversation"}
+              className={`chat-tab ${activeTab === "conversation" ? "active" : ""}`}
+              onClick={() => setActiveTab("conversation")}
+            >
+              Conversation
+            </button>
+            <button
+              role="tab"
+              aria-selected={activeTab === "articles"}
+              className={`chat-tab ${activeTab === "articles" ? "active" : ""}`}
+              onClick={() => setActiveTab("articles")}
+            >
+              Articles
+            </button>
+          </div>
 
-          {!threadActive && !selectedArticle && (
+          {activeTab === "conversation" && !threadActive && (
             <div className="chat-popup__greeting">
               <div className="logo-placeholder logo-placeholder--sm" aria-hidden="true">
                 <Sparkle size={18} />
               </div>
-              <p className="chat-popup__greeting-title">How can we help?</p>
-              <p className="chat-popup__legal">Ask a question or browse topics below.</p>
+              <p className="chat-popup__greeting-title">Hi, How Can I Help?</p>
+              <p className="chat-popup__legal">By using this service, you agree to the AI terms.</p>
 
               {isLoading ? (
                 <p style={{ textAlign: "center", color: "#9a9a9a" }}>Loading knowledge base...</p>
               ) : (
-                <>
-                  <div className="category-buttons">
-                    {CATEGORIES.map((cat) => (
-                      <button
-                        key={cat.id}
-                        className={`category-btn ${selectedCategory === cat.id ? "active" : ""}`}
-                        onClick={() => setSelectedCategory(selectedCategory === cat.id ? null : cat.id)}
-                      >
-                        {cat.name}
-                      </button>
-                    ))}
-                  </div>
-
-                  {allTags.length > 0 && (
-                    <div className="tags-section">
-                      <p style={{ fontSize: "12px", color: "#5f5f5f", marginBottom: "8px" }}>Filter by tags:</p>
-                      <div className="tag-buttons">
-                        {allTags.slice(0, 6).map((tag) => (
-                          <button
-                            key={tag}
-                            className={`tag-btn ${selectedTags.has(tag) ? "active" : ""}`}
-                            onClick={() => toggleTag(tag)}
-                          >
-                            {tag}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="suggestions">
-                    {displayedArticles.slice(0, 3).map((article) => (
-                      <button
-                        key={article.id}
-                        className="suggestion-pill"
-                        onClick={() => selectArticleFromMessage(article)}
-                      >
-                        <ChatCircle size={14} aria-hidden="true" />
-                        {article.title}
-                      </button>
-                    ))}
-                  </div>
-                </>
+                <div className="entry-menu">
+                  <button className="entry-menu-btn" onClick={askMDLive}>
+                    <Headset size={16} aria-hidden="true" />
+                    <span>Ask MD Live</span>
+                  </button>
+                  <button
+                    className="entry-menu-btn"
+                    onClick={() => showCategoryArticles("general-info", "General Questions")}
+                  >
+                    <Sparkle size={16} aria-hidden="true" />
+                    <span>General Questions</span>
+                  </button>
+                </div>
               )}
             </div>
           )}
 
-          {threadActive && (
+          {activeTab === "conversation" && threadActive && (
             <div className="thread" ref={threadRef} aria-live="polite">
               {messages.map((msg) => {
                 if (msg.who === "user")
@@ -573,25 +697,43 @@ export default function App() {
                     <div className="msg-avatar" aria-hidden="true">
                       <Sparkle size={12} />
                     </div>
-                    <div className="msg-bubble msg-bubble--bot">
-                      {msg.text}
+                    <div className="msg-content">
+                      {msg.text && <div className="msg-bubble msg-bubble--bot">{msg.text}</div>}
                       {msg.article && (
-                        <button
-                          onClick={() => selectArticleFromMessage(msg.article!)}
-                          style={{
-                            display: "block",
-                            marginTop: "8px",
-                            padding: "6px 10px",
-                            fontSize: "12px",
-                            background: "rgba(255,255,255,0.2)",
-                            border: "none",
-                            borderRadius: "4px",
-                            cursor: "pointer",
-                            color: "inherit",
-                          }}
-                        >
-                          Read Article →
-                        </button>
+                        <div className="article-card">
+                          <div className="article-card__breadcrumb">
+                            <span>MDLIVE</span>
+                            <span aria-hidden="true">·</span>
+                            <span>Articles</span>
+                          </div>
+                          <div className="article-card__thumb" aria-hidden="true">
+                            <FileText size={26} />
+                          </div>
+                          <div className="article-card__body">
+                            <p className="article-card__title">{msg.article.title}</p>
+                            <p className="article-card__desc">{excerpt(msg.article.content)}</p>
+                            <div className="article-card__byline">
+                              <span>MDLIVE Care Team</span>
+                              <span aria-hidden="true">·</span>
+                              <span>{readTime(msg.article.content)} min read</span>
+                            </div>
+                            <button
+                              className="article-card__cta"
+                              onClick={() => openArticle(msg.article!)}
+                            >
+                              View article
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                      {msg.chips && msg.chips.length > 0 && (
+                        <div className="chip-row">
+                          {msg.chips.map((c) => (
+                            <button key={c.key} className="chip-btn" onClick={c.onClick}>
+                              {c.label}
+                            </button>
+                          ))}
+                        </div>
                       )}
                     </div>
                   </div>
@@ -600,21 +742,85 @@ export default function App() {
             </div>
           )}
 
-          <div className="composer">
-            <input
-              className="composer__input"
-              ref={composerRef}
-              type="text"
-              placeholder="Ask a question..."
-              aria-label="Ask a question"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleComposerKey}
-            />
-            <button className="btn-circle btn-circle--sm" aria-label="Send" onClick={handleSend}>
-              <PaperPlaneTilt size={14} />
-            </button>
-          </div>
+          {activeTab === "articles" && (
+            <div className="chat-popup__greeting articles-panel">
+              {selectedArticle ? (
+                <div className="article-viewer">
+                  <button className="back-link" onClick={() => setSelectedArticle(null)}>
+                    <ArrowLeft size={12} aria-hidden="true" />
+                    All articles
+                  </button>
+                  <h3>{selectedArticle.title}</h3>
+                  <div className="article-content">
+                    {selectedArticle.content.split("\n").map((line, i) => (
+                      <p key={i}>{line}</p>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="history-panel">
+                  <div className="history-section">
+                    <p className="history-section__label">Saved Conversations</p>
+                    {savedConversations.length === 0 ? (
+                      <p className="history-empty">No saved conversations yet.</p>
+                    ) : (
+                      savedConversations.map((c) => (
+                        <button
+                          key={c.id}
+                          className="history-item"
+                          onClick={() => {
+                            const a = articles.find((x) => x.id === c.articleId);
+                            if (a) setSelectedArticle(a);
+                          }}
+                        >
+                          <ChatCircle size={16} aria-hidden="true" />
+                          <span className="history-item__body">
+                            <span className="history-item__title">{c.title}</span>
+                            <span className="history-item__meta">{formatTimestamp(c.timestamp)}</span>
+                          </span>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                  <div className="history-section">
+                    <p className="history-section__label">Recent Search</p>
+                    {recentSearches.length === 0 ? (
+                      <p className="history-empty">No recent searches yet.</p>
+                    ) : (
+                      recentSearches.map((q) => (
+                        <button
+                          key={q}
+                          className="history-item history-item--search"
+                          onClick={() => ask(q)}
+                        >
+                          <MagnifyingGlass size={14} aria-hidden="true" />
+                          <span>{q}</span>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === "conversation" && (
+            <div className="composer">
+              <input
+                className="composer__input"
+                ref={composerRef}
+                type="text"
+                placeholder="Ask a question..."
+                aria-label="Ask a question"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleComposerKey}
+              />
+              <button className="btn-circle btn-circle--sm" aria-label="Send" onClick={handleSend}>
+                <PaperPlaneTilt size={14} />
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
