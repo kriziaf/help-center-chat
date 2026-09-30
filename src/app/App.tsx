@@ -17,11 +17,14 @@ import {
   ArrowLeft,
   PaperPlaneTilt,
   Headset,
+  FileText,
+  Stethoscope,
 } from "@phosphor-icons/react";
 import "../styles/helpcenter.css";
 import { SCENARIOS, type ScenarioType } from "../config/scenarios";
+import { SMART_FLOW, CONDITIONS, type SmartChip, type ConditionOption } from "../config/smartFlow";
 
-interface Article {
+export interface Article {
   id: string;
   title: string;
   category: string;
@@ -416,6 +419,114 @@ export default function App() {
     }, 600);
   }
 
+  // Render any node in the SMART_FLOW tree. If userEchoLabel is provided, first post a user
+  // bubble + typing indicator (chip-driven entry); if omitted, post the bot turn directly
+  // with no preceding user bubble (the very first, unprompted "Ask MD Live" turn).
+  function goToSmartNode(nodeId: string, userEchoLabel?: string) {
+    const node = SMART_FLOW[nodeId];
+    if (!node) return;
+
+    setThreadActive(true);
+    setActiveTab("conversation");
+
+    const render = () => {
+      const chips: ChipOption[] | undefined = node.chips?.map((c) => ({
+        key: c.key,
+        label: c.label,
+        onClick: () => resolveSmartChip(c),
+      }));
+      const botMsg: Message = { who: "bot", text: node.text, id: msgId++, chips };
+      setMessages((prev) => prev.filter((m) => m.who !== "typing").concat(botMsg));
+    };
+
+    if (userEchoLabel) {
+      const userMsg: Message = { who: "user", text: userEchoLabel, id: msgId++ };
+      const typingMsg: Message = { who: "typing", text: "...", id: msgId++ };
+      setMessages((prev) => [...prev, userMsg, typingMsg]);
+    } else {
+      const typingMsg: Message = { who: "typing", text: "...", id: msgId++ };
+      setMessages((prev) => [...prev, typingMsg]);
+    }
+    setTimeout(render, 500);
+  }
+
+  // Dispatch a single chip's action: navigate within the tree, escape to an existing flow,
+  // or resolve+open a real Article by id (explicit "Read the full article" request).
+  function resolveSmartChip(chip: SmartChip) {
+    if (chip.articleId) {
+      const article = articles.find((a) => a.id === chip.articleId);
+      if (article) selectSubtopic(article);
+      return;
+    }
+    if (chip.action === "reset") return handleReset();
+    if (chip.action === "learn-more") return handleLearnMore();
+    if (chip.action === "category:pediatric-care") {
+      return showCategoryArticles("pediatric-care", "Show Pediatric Care topics");
+    }
+    if (chip.goTo) return goToSmartNode(chip.goTo, chip.label);
+  }
+
+  function showConditionsMenu() {
+    setThreadActive(true);
+    setActiveTab("conversation");
+    const userMsg: Message = { who: "user", text: "Ask about conditions", id: msgId++ };
+    const typingMsg: Message = { who: "typing", text: "...", id: msgId++ };
+    setMessages((prev) => [...prev, userMsg, typingMsg]);
+
+    setTimeout(() => {
+      const botMsg: Message = {
+        who: "bot",
+        text: "Sure — which condition would you like to talk about?",
+        id: msgId++,
+        chips: CONDITIONS.map((c) => ({
+          key: c.key,
+          label: c.label,
+          onClick: () => selectCondition(c),
+        })),
+      };
+      setMessages((prev) => prev.filter((m) => m.who !== "typing").concat(botMsg));
+    }, 500);
+  }
+
+  function selectCondition(condition: ConditionOption) {
+    if (condition.smartNodeId) {
+      goToSmartNode(condition.smartNodeId, condition.label);
+      return;
+    }
+    askUnscriptedCondition(condition);
+  }
+
+  function askUnscriptedCondition(condition: ConditionOption) {
+    const userMsg: Message = { who: "user", text: condition.label, id: msgId++ };
+    const typingMsg: Message = { who: "typing", text: "...", id: msgId++ };
+    setMessages((prev) => [...prev, userMsg, typingMsg]);
+
+    setTimeout(() => {
+      const results = searchArticles(articles, condition.label);
+      let botMsg: Message;
+      if (results.length > 0) {
+        const top = results[0];
+        botMsg = {
+          who: "bot",
+          text: `Here's something that might help with ${condition.label.toLowerCase()}. Did you want more information?`,
+          id: msgId++,
+          chips: [
+            { key: "article", label: "Read the full article", onClick: () => selectSubtopic(top) },
+            { key: "reset", label: "Back to main menu", onClick: handleReset },
+          ],
+        };
+      } else {
+        botMsg = {
+          who: "bot",
+          text: `I don't have a scripted answer for ${condition.label} yet, but our care team can help directly — give us a call at 1-800-400-6354.`,
+          id: msgId++,
+          chips: [{ key: "reset", label: "Back to main menu", onClick: handleReset }],
+        };
+      }
+      setMessages((prev) => prev.filter((m) => m.who !== "typing").concat(botMsg));
+    }, 700);
+  }
+
   function handleLearnMore() {
     const userMsg: Message = { who: "user", text: "Learn about other services", id: msgId++ };
     const typingMsg: Message = { who: "typing", text: "...", id: msgId++ };
@@ -582,9 +693,7 @@ export default function App() {
   }
 
   function askMDLive() {
-    setThreadActive(true);
-    setActiveTab("conversation");
-    setTimeout(() => composerRef.current?.focus(), 0);
+    goToSmartNode("wh-menopause");
   }
 
   function openCategoryChat(categoryId: string, label: string) {
@@ -791,10 +900,14 @@ export default function App() {
                   </button>
                   <button
                     className="entry-menu-btn"
-                    onClick={() => showCategoryArticles("general-info", "General Questions")}
+                    onClick={() => showCategoryArticles("general-info", "Popular Topics")}
                   >
                     <Sparkle size={16} aria-hidden="true" />
-                    <span>General Questions</span>
+                    <span>Popular Topics</span>
+                  </button>
+                  <button className="entry-menu-btn" onClick={showConditionsMenu}>
+                    <Stethoscope size={16} aria-hidden="true" />
+                    <span>Ask about conditions</span>
                   </button>
                 </div>
               )}
