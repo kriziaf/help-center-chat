@@ -22,7 +22,10 @@ import {
 } from "@phosphor-icons/react";
 import "../styles/helpcenter.css";
 import { SCENARIOS, type ScenarioType } from "../config/scenarios";
-import { SMART_FLOW, CONDITIONS, type SmartChip, type ConditionOption } from "../config/smartFlow";
+import { SMART_FLOW, type SmartNode, type SmartChip } from "../config/smartFlow";
+import { CONDITIONS, CONDITION_NODES } from "../config/conditionsFlow";
+
+const ALL_SMART_NODES: Record<string, SmartNode> = { ...SMART_FLOW, ...CONDITION_NODES };
 
 export interface Article {
   id: string;
@@ -423,7 +426,7 @@ export default function App() {
   // bubble + typing indicator (chip-driven entry); if omitted, post the bot turn directly
   // with no preceding user bubble (the very first, unprompted "Ask MD Live" turn).
   function goToSmartNode(nodeId: string, userEchoLabel?: string) {
-    const node = SMART_FLOW[nodeId];
+    const node = ALL_SMART_NODES[nodeId];
     if (!node) return;
 
     setThreadActive(true);
@@ -463,6 +466,15 @@ export default function App() {
     if (chip.action === "category:pediatric-care") {
       return showCategoryArticles("pediatric-care", "Show Pediatric Care topics");
     }
+    if (chip.action === "blog-placeholder") {
+      const botMsg: Message = {
+        who: "bot",
+        text: "This would link out to the full MD Live blog article on this topic — link coming soon!",
+        id: msgId++,
+      };
+      setMessages((prev) => [...prev, botMsg]);
+      return;
+    }
     if (chip.goTo) return goToSmartNode(chip.goTo, chip.label);
   }
 
@@ -481,50 +493,11 @@ export default function App() {
         chips: CONDITIONS.map((c) => ({
           key: c.key,
           label: c.label,
-          onClick: () => selectCondition(c),
+          onClick: () => goToSmartNode(c.nodeId, c.label),
         })),
       };
       setMessages((prev) => prev.filter((m) => m.who !== "typing").concat(botMsg));
     }, 500);
-  }
-
-  function selectCondition(condition: ConditionOption) {
-    if (condition.smartNodeId) {
-      goToSmartNode(condition.smartNodeId, condition.label);
-      return;
-    }
-    askUnscriptedCondition(condition);
-  }
-
-  function askUnscriptedCondition(condition: ConditionOption) {
-    const userMsg: Message = { who: "user", text: condition.label, id: msgId++ };
-    const typingMsg: Message = { who: "typing", text: "...", id: msgId++ };
-    setMessages((prev) => [...prev, userMsg, typingMsg]);
-
-    setTimeout(() => {
-      const results = searchArticles(articles, condition.label);
-      let botMsg: Message;
-      if (results.length > 0) {
-        const top = results[0];
-        botMsg = {
-          who: "bot",
-          text: `Here's something that might help with ${condition.label.toLowerCase()}. Did you want more information?`,
-          id: msgId++,
-          chips: [
-            { key: "article", label: "Read the full article", onClick: () => selectSubtopic(top) },
-            { key: "reset", label: "Back to main menu", onClick: handleReset },
-          ],
-        };
-      } else {
-        botMsg = {
-          who: "bot",
-          text: `I don't have a scripted answer for ${condition.label} yet, but our care team can help directly — give us a call at 1-800-400-6354.`,
-          id: msgId++,
-          chips: [{ key: "reset", label: "Back to main menu", onClick: handleReset }],
-        };
-      }
-      setMessages((prev) => prev.filter((m) => m.who !== "typing").concat(botMsg));
-    }, 700);
   }
 
   function handleLearnMore() {

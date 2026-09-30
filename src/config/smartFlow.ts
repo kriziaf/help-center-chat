@@ -103,18 +103,3 @@ export const SMART_FLOW: Record<string, SmartNode> = {
     text: "Glad I could help today — take care, and reach out anytime you have more questions!",
   },
 };
-
-/** Entry points for "Ask about conditions" — Menopause reuses SMART_FLOW, others are unscripted. */
-export interface ConditionOption {
-  key: string;
-  label: string;
-  /** If set, clicking enters SMART_FLOW at this node id */
-  smartNodeId?: string;
-}
-
-export const CONDITIONS: ConditionOption[] = [
-  { key: "menopause", label: "Menopause", smartNodeId: "wh-menopause" },
-  { key: "diabetes", label: "Diabetes" },
-  { key: "anxiety", label: "Anxiety" },
-  { key: "acne", label: "Acne" },
-];
