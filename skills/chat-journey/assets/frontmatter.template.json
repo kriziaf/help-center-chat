@@ -1,0 +1,76 @@
+{
+  "_comment": "Frontmatter cards. {{path}} values come from the build context (stats.*, j.<id>.*). 'blocks' are [p, text] | [callout, label, text] | [point, heading, text]. Cards in 'left' stack in the left column; 'grid' fills two columns left to right, top to bottom.",
+  "section": "Ask MD Live Chat — Entry Flows",
+  "left": [
+    {
+      "name": "Summary", "heading": "Ask MD Live Chat: Entry Flows",
+      "blocks": [
+        ["p", "The chat popup opens with three entry buttons. Each one is a deliberately different interaction pattern: they differ in how the conversation behaves, not only in which topic they cover."],
+        ["callout", "Three buttons, three patterns", "Popular Topics  ·  Ask MD Live  ·  Ask about conditions"],
+        ["point", "Popular Topics", "Picks a destination and stops there: one internal article."],
+        ["point", "Ask MD Live", "Keeps the conversation going without pointing outside itself, unless the user asks for an article."],
+        ["point", "Ask about conditions", "Keeps the conversation going too, but ends by sending the user to the original MD Live blog article."]
+      ]
+    },
+    {
+      "name": "Knowledgebase", "heading": "Knowledgebase",
+      "blocks": [
+        ["p", "The content behind the chat comes from two repo sources. Popular Topics serves articles, Ask MD Live paraphrases them, and Ask about conditions uses blog snippets."],
+        ["callout", "{{stats.articles}} articles, {{stats.conditions}} blog conditions", "{{stats.categories}} article categories in public/, plus short blog snippets in conditionsFlow.ts"],
+        ["point", "Q&A articles", "Markdown files grouped into {{stats.categories}} categories. Each ## heading is a question and the text under it is the answer."],
+        ["point", "Blog conditions", "{{stats.conditions}} conditions with about {{stats.snippets}} short snippets, parsed from the MD Live blog. Blog URLs are not in the repo yet."],
+        ["point", "Counts differ", "KB_SCHEMA.json says {{stats.schemaQA}} Q&A pairs, but the article files contain {{stats.qaHeadings}} question headings."]
+      ]
+    }
+  ],
+  "grid": [
+    {
+      "name": "Journey A", "heading": "Journey A: Popular Topics",
+      "blocks": [
+        ["p", "The rigid, chip-driven path into the internal knowledge base. The same click always produces the same next step."],
+        ["callout", "{{j.A.screens}} screens", "category chips → article card → full article"],
+        ["p", "Never conversational: there is no “did you want to know about X too?” step. Content comes from the app’s public article files."]
+      ]
+    },
+    {
+      "name": "Journey B", "heading": "Journey B: Ask MD Live",
+      "blocks": [
+        ["p", "A warm, bridging conversation modeled on the Women’s Health voice and tone example. Each turn gives a short answer and bridges to a related topic with follow-up chips."],
+        ["callout", "{{j.B.screens}} screens, {{j.B.branches}} branches", "menopause → prescriptions → GLP-1s → cost → insurance"],
+        ["p", "It never auto-surfaces an article. One appears only when the user taps “Read the full article”."]
+      ]
+    },
+    {
+      "name": "Journey C", "heading": "Journey C: Ask about conditions",
+      "blocks": [
+        ["p", "The same bridging engine, built from {{stats.conditions}} real MD Live blog conditions. It is a browsable front end over the blog, not a curated script."],
+        ["callout", "Headache example, {{j.C.screens}} screens", "Headache → Headache Types → Migraine Headache"],
+        ["p", "Every snippet is offered as a chip. Cough / Respiratory and Headache add one nested level, and a “Read more on our blog” chip points back to the source."]
+      ]
+    },
+    {
+      "name": "Edge Cases", "heading": "Edge Cases",
+      "blocks": [
+        ["point", "Category bridging", "From Women’s Health, “Ask about my child’s care” offers Pediatric Care topics and hands off to the Journey A picker."],
+        ["point", "Dead-end recovery", "If the bot cannot answer, it says so warmly and offers the phone number 1-800-400-6354 as a way forward."],
+        ["point", "Friendly closing", "When the user is finished, the flow ends with a friendly sign-off and no further chips."]
+      ]
+    },
+    {
+      "name": "How to read this file", "heading": "How to read this file",
+      "blocks": [
+        ["point", "User Journeys - UI", "Screens built from the repo’s real UI: its colors, radii, Montserrat and icons. Each shows the last turn of the chat thread."],
+        ["point", "User Journey lowfi", "The flow with no screens. Same steps and column positions as the UI page, so the two line up."],
+        ["point", "Generated from the repo", "Content, tokens and icons come from the help-center-chat repo via the chat-journey skill."]
+      ]
+    },
+    {
+      "name": "Open Items", "heading": "Open Items",
+      "blocks": [
+        ["point", "Blog link", "“Read more on our blog” is still a placeholder: the source data has no per-condition URLs yet."],
+        ["point", "Pediatric hand-off", "The jump from the peds-bridge branch into the Journey A picker is described in a note, not drawn as an arrow."],
+        ["point", "Keeping pages in sync", "The UI and lowfi pages are separate, so a change to one step has to be made on both."]
+      ]
+    }
+  ]
+}
