@@ -1,0 +1,225 @@
+{
+  "_comment": "Journey definitions. Repo-derived content is referenced, not typed: {\"$node\":id} pulls text/chips from SMART_FLOW + CONDITION_NODES, {\"$conditions\":true} the 15 condition labels, {\"$articleTitles\":cat} the article titles of a KB category, {\"$article\":key} an article (see 'articles' below). Strings may use {{path}} from the build context (article.*, stats.*, cat.*). 'ui' items drive the User Journeys - UI page (chips attach to the previous bot message). 'low' items drive the lowfi page and are condensed, editorial text.",
+  "articles": {
+    "access": "general-info/mdlive-access-setup.md"
+  },
+  "journeys": [
+    {
+      "id": "A",
+      "name": "Journey A — Popular Topics",
+      "sub": "Rigid, deterministic. Ends in an internal article.",
+      "bg": [0.675, 0.8675, 0.8708],
+      "steps": [
+        {
+          "id": "A1", "title": "A1 · Entry menu", "entry": true,
+          "low": [
+            ["bot", "Hi, How Can I Help?"],
+            ["chips", ["Ask MD Live", "Popular Topics", "Ask about conditions"]],
+            ["note", "3 entry buttons — shared across all journeys"]
+          ]
+        },
+        {
+          "id": "A2", "title": "A2 · Category chips", "tap": "Popular Topics",
+          "ui": [
+            ["user", "Popular Topics"],
+            ["bot", "Here are our {{cat.general-info}} topics. Which one fits best?"],
+            ["chips", {"$articleTitles": "general-info"}]
+          ],
+          "low": [
+            ["user", "Popular Topics"],
+            ["bot", "Here are our {{cat.general-info}} topics. Which one fits best?"],
+            ["chips", {"$articleTitles": "general-info"}]
+          ]
+        },
+        {
+          "id": "A3", "title": "A3 · Article card", "tap": "{{article.access.title}}",
+          "ui": [
+            ["user", "{{article.access.title}}"],
+            ["bot", "Ok, I think this article might help."],
+            ["bot", "Here's a relevant article from MDLIVE."],
+            ["card", {"$article": "access"}],
+            ["bot", "What would you like to do next?"],
+            ["chips", ["Learn about other services", "Back to main menu"]]
+          ],
+          "low": [
+            ["user", "{{article.access.title}}"],
+            ["bot", "Ok, I think this article might help."],
+            ["note", "Card: “{{article.access.title}}” article + View article button"],
+            ["bot", "What would you like to do next?"],
+            ["chips", ["Learn about other services", "Back to main menu"]],
+            ["note", "↺ “Learn about other services” → A2 (new category)"],
+            ["note", "↺ “Back to main menu” → A1 · Entry menu"]
+          ]
+        },
+        {
+          "id": "A4", "title": "A4 · Full article viewer", "tap": "View article", "tab": "Articles", "composer": false,
+          "ui": [["viewer", {"$article": "access"}]],
+          "low": [
+            ["bot", "{{article.access.title}} — full article content (Articles tab), with “All articles” back link."],
+            ["end", "● END — no further chips"]
+          ]
+        }
+      ],
+      "branches": []
+    },
+    {
+      "id": "B",
+      "name": "Journey B — Ask MD Live",
+      "sub": "Smart bridging, hand-scripted. Never auto-surfaces an article.",
+      "bg": [0.97, 0.88, 0.72],
+      "steps": [
+        {
+          "id": "B1", "title": "B1 · Entry menu", "entry": true,
+          "low": [
+            ["bot", "Hi, How Can I Help?"],
+            ["chips", ["Ask MD Live", "Popular Topics", "Ask about conditions"]],
+            ["note", "3 entry buttons — shared across all journeys"]
+          ]
+        },
+        {
+          "id": "B2", "title": "B2 · wh-menopause", "tap": "Ask MD Live",
+          "ui": [["bot", {"$node": "wh-menopause"}], ["chips", {"$node": "wh-menopause"}]],
+          "low": [
+            ["bot", "For perimenopause/menopause, an MDLIVE Primary Care doctor can build a plan — HRT, weight mgmt, mental health, sleep. Want prescription options?"],
+            ["chips", {"$node": "wh-menopause"}],
+            ["note", "↺ “Ask about my child’s care” → Branch · peds-bridge"],
+            ["note", "↺ “Not right now” → Branch · dead-end"]
+          ]
+        },
+        {
+          "id": "B3", "title": "B3 · wh-prescriptions", "tap": "Prescription options",
+          "ui": [["user", "Prescription options"], ["bot", {"$node": "wh-prescriptions"}], ["chips", {"$node": "wh-prescriptions"}]],
+          "low": [
+            ["user", "Prescription options"],
+            ["bot", "Your doctor can send prescriptions to your pharmacy, incl. birth control. Want to know about GLP-1s?"],
+            ["chips", {"$node": "wh-prescriptions"}],
+            ["note", "↺ “Read the full article” → internal article viewer (A4 mechanic)"],
+            ["note", "↺ “Back to main menu” → B1"]
+          ]
+        },
+        {
+          "id": "B4", "title": "B4 · wh-glp1", "tap": "GLP-1s for weight management",
+          "ui": [["user", "GLP-1s for weight management"], ["bot", {"$node": "wh-glp1"}], ["chips", {"$node": "wh-glp1"}]],
+          "low": [
+            ["user", "GLP-1s for weight management"],
+            ["bot", "MDLIVE can prescribe GLP-1s (Wegovy, Zepbound) via Routine Care, state-dependent. Want cost details?"],
+            ["chips", {"$node": "wh-glp1"}],
+            ["note", "↺ “Something else” → Branch · dead-end"]
+          ]
+        },
+        {
+          "id": "B5", "title": "B5 · wh-cost", "tap": "Cost & coverage",
+          "ui": [["user", "Cost & coverage"], ["bot", {"$node": "wh-cost"}], ["chips", {"$node": "wh-cost"}]],
+          "low": [
+            ["user", "Cost & coverage"],
+            ["bot", "Cost varies by plan — $0 copay possible, $59-$99 without insurance. Want insurance details?"],
+            ["chips", {"$node": "wh-cost"}]
+          ]
+        },
+        {
+          "id": "B6", "title": "B6 · wh-insurance", "tap": "Insurance coverage details",
+          "ui": [["user", "Insurance coverage details"], ["bot", {"$node": "wh-insurance"}], ["chips", {"$node": "wh-insurance"}]],
+          "low": [
+            ["user", "Insurance coverage details"],
+            ["bot", "HSA/FSA eligible; Medicaid/Medicare accepted in participating states. Anything else?"],
+            ["chips", {"$node": "wh-insurance"}]
+          ]
+        },
+        {
+          "id": "B7", "title": "B7 · closing", "tap": "That's all, thanks",
+          "ui": [["user", "That's all, thanks"], ["bot", {"$node": "closing"}]],
+          "low": [
+            ["user", "That's all, thanks"],
+            ["bot", "Glad I could help today — take care, and reach out anytime!"],
+            ["end", "● END — no further chips"]
+          ]
+        }
+      ],
+      "branches": [
+        {
+          "id": "peds", "title": "Branch · peds-bridge", "uiLabel": "Branch · peds-bridge (from B2: “Ask about my child’s care”)", "col": 1,
+          "ui": [["user", "Ask about my child's care"], ["bot", {"$node": "peds-bridge"}], ["chips", {"$node": "peds-bridge"}]],
+          "low": [
+            ["user", "Ask about my child's care"],
+            ["bot", "MDLIVE also sees children and dependents, 24/7. Would you like to see our Pediatric Care topics?"],
+            ["chips", {"$node": "peds-bridge"}],
+            ["note", "“Show Pediatric Care topics” bridges into Journey A’s category-picker mechanic"],
+            ["note", "↺ “Back to Women’s Health” → B2"]
+          ]
+        },
+        {
+          "id": "dead", "title": "Branch · dead-end", "uiLabel": "Branch · dead-end (from B2 “Not right now” or B4 “Something else”)", "col": 3,
+          "ui": [["user", "Not right now"], ["bot", {"$node": "dead-end"}], ["chips", {"$node": "dead-end"}]],
+          "low": [
+            ["user", "Not right now"],
+            ["bot", "I don't want to guess — please call 1-800-400-6354 for personalized help."],
+            ["chips", {"$node": "dead-end"}],
+            ["note", "Also reachable from B4 (“Something else”)"],
+            ["note", "↺ “Back to main menu” → B1 · Entry menu"]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "C",
+      "name": "Journey C — Ask about conditions",
+      "sub": "Smart bridging over real blog content. Headache example.",
+      "bg": [0.85, 0.8, 0.95],
+      "steps": [
+        {
+          "id": "C1", "title": "C1 · Entry menu", "entry": true,
+          "low": [
+            ["bot", "Hi, How Can I Help?"],
+            ["chips", ["Ask MD Live", "Popular Topics", "Ask about conditions"]],
+            ["note", "3 entry buttons — shared across all journeys"]
+          ]
+        },
+        {
+          "id": "C2", "title": "C2 · Conditions menu", "tap": "Ask about conditions",
+          "ui": [
+            ["user", "Ask about conditions"],
+            ["bot", "Sure — which condition would you like to talk about?"],
+            ["chips", {"$conditions": true}]
+          ],
+          "low": [
+            ["user", "Ask about conditions"],
+            ["bot", "Sure — which condition would you like to talk about?"],
+            ["chips", {"$conditions": true, "pick": ["Back Pain", "Sleep Disorders", "Cough / Respiratory", "Headache"], "more": "+{n} more"}],
+            ["note", "{{stats.conditions}} real blog conditions in total"]
+          ]
+        },
+        {
+          "id": "C3", "title": "C3 · Condition root (Headache)", "tap": "Headache",
+          "ui": [["user", "Headache"], ["bot", {"$node": "cond-headache"}], ["chips", {"$node": "cond-headache"}]],
+          "low": [["user", "Headache"], ["bot", {"$node": "cond-headache"}], ["chips", {"$node": "cond-headache"}]]
+        },
+        {
+          "id": "C4", "title": "C4 · Nested sub-picker", "tap": "Headache Types",
+          "ui": [["user", "Headache Types"], ["bot", {"$node": "cond-headache-headache-types"}], ["chips", {"$node": "cond-headache-headache-types"}]],
+          "low": [
+            ["user", "Headache Types"],
+            ["bot", {"$node": "cond-headache-headache-types"}],
+            ["chips", {"$node": "cond-headache-headache-types", "limit": 3, "more": "+{n} more"}],
+            ["note", "Nested level — only Cough / Respiratory and Headache have it"]
+          ]
+        },
+        {
+          "id": "C5", "title": "C5 · Leaf snippet answer", "tap": "Migraine Headache",
+          "ui": [
+            ["user", "Migraine Headache"],
+            ["bot", {"$node": "cond-headache-headache-types-migraine-headache"}],
+            ["chips", {"$node": "cond-headache-headache-types-migraine-headache"}]
+          ],
+          "low": [
+            ["user", "Migraine Headache"],
+            ["bot", {"$node": "cond-headache-headache-types-migraine-headache"}],
+            ["chips", {"$node": "cond-headache-headache-types-migraine-headache", "limit": 2, "keepTail": 2, "more": "+{n} more types"}],
+            ["note", "“Read more on our blog” — placeholder per spec (no real link yet)"],
+            ["note", "↺ “Back to main menu” → C1"]
+          ]
+        }
+      ],
+      "branches": []
+    }
+  ]
+}
