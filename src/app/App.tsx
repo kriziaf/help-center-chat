@@ -1,1041 +1,1512 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react"
 import {
-  User,
-  ArrowDown,
-  Sparkle,
-  ArrowUp,
-  MagnifyingGlass,
-  IdentificationBadge,
-  Key,
-  Lock,
-  ChatCircle,
-  PencilSimple,
-  ClockCounterClockwise,
-  ArrowsOut,
-  ArrowsIn,
-  X,
   ArrowLeft,
-  PaperPlaneTilt,
+  ArrowRight,
+  ArrowsIn,
+  ArrowsOut,
+  Baby,
+  Brain,
+  BuildingOffice,
+  CaretDown,
+  ChartBar,
+  ChatCircle,
+  Check,
+  ClipboardText,
+  CreditCard,
+  GenderMale,
+  Heart,
   Headset,
-  FileText,
-  Stethoscope,
-} from "@phosphor-icons/react";
-import "../styles/helpcenter.css";
-import { SCENARIOS, type ScenarioType } from "../config/scenarios";
-import { SMART_FLOW, type SmartNode, type SmartChip } from "../config/smartFlow";
-import { CONDITIONS, CONDITION_NODES } from "../config/conditionsFlow";
+  Info,
+  PaperPlaneTilt,
+  PencilSimple,
+  Pill,
+  Play,
+  ShieldCheck,
+  Sparkle,
+  UsersThree,
+  X,
+  type Icon,
+} from "@phosphor-icons/react"
+import packageJson from "../../package.json"
+import { SCENARIOS, type ScenarioType } from "../config/scenarios"
+import { SMART_FLOW, CONDITIONS, type SmartNode } from "../config/smartFlow"
+import { fetchArticles, searchArticles } from "../utils/kb"
 
-const ALL_SMART_NODES: Record<string, SmartNode> = { ...SMART_FLOW, ...CONDITION_NODES };
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface Article {
-  id: string;
-  title: string;
-  category: string;
-  tags: string[];
-  content: string;
-  fileName: string;
-  questions: string[];
+  id: string
+  title: string
+  category: string
+  tags: string[]
+  questions: string[]
+  content: string
 }
 
-interface Category {
-  id: string;
-  name: string;
-  description: string;
+export interface Message {
+  id: string
+  role: "user" | "bot"
+  text?: string
+  articles?: Article[]
+  chips?: { key: string; label: string }[]
+  loading?: boolean
+  error?: boolean
+  isGreeting?: boolean
+  smartNodeId?: string
 }
 
-interface SavedConversation {
-  id: string;
-  title: string;
-  subtitle: string;
-  timestamp: number;
-  articleId: string;
+type HelpCenterView = "patient" | "business"
+
+// ─── KB Categories ───────────────────────────────────────────────────────────
+
+const KB_CATEGORIES = [
+  "womens-health",
+  "mens-health",
+  "mental-health",
+  "pediatric-care",
+  "prescriptions",
+  "dermatology",
+  "insurance",
+  "general-info",
+]
+
+const CATEGORY_LABELS: Record<string, string> = {
+  "womens-health": "Women's Health",
+  "mens-health": "Men's Health",
+  "mental-health": "Mental Health",
+  "pediatric-care": "Pediatric Care",
+  prescriptions: "Prescriptions",
+  dermatology: "Dermatology",
+  insurance: "Insurance",
+  "general-info": "General Info",
 }
 
-type ChipOption = { key: string; label: string; onClick: () => void };
-
-type Message = {
-  who: "user" | "bot" | "typing";
-  text: string;
-  id: number;
-  article?: Article;
-  chips?: ChipOption[];
-};
-
-let msgId = 0;
-
-const CATEGORIES: Category[] = [
-  { id: "general-info", name: "General Info", description: "Service overview & setup" },
-  { id: "womens-health", name: "Women's Health", description: "Women health & wellness" },
-  { id: "mens-health", name: "Men's Health", description: "Men health & wellness" },
-  { id: "dermatology", name: "Dermatology", description: "Skin care services" },
-  { id: "mental-health", name: "Mental Health", description: "Therapy & psychiatry" },
-  { id: "pediatric-care", name: "Pediatric Care", description: "Children health services" },
-  { id: "prescriptions", name: "Prescriptions", description: "Medications & prescriptions" },
-  { id: "insurance", name: "Insurance", description: "Coverage & billing" },
-];
-
-const RECENT_SEARCHES_KEY = "hc_recent_searches";
-const SAVED_CONVERSATIONS_KEY = "hc_saved_conversations";
-
-function setRoute(name: "home" | "conversation", fullscreen: boolean) {
-  if (!fullscreen) return;
-  const target = "#/" + name;
-  if (window.location.hash === target) return;
-  window.location.hash = target;
+const CATEGORY_ICONS: Record<string, Icon> = {
+  "womens-health": Heart,
+  "mens-health": GenderMale,
+  "mental-health": Brain,
+  "pediatric-care": Baby,
+  prescriptions: Pill,
+  dermatology: Sparkle,
+  insurance: ClipboardText,
+  "general-info": Info,
 }
 
-function clearRoute() {
-  if (!window.location.hash) return;
-  history.replaceState(null, "", window.location.pathname + window.location.search);
+const HELP_CENTER_VIEWS: {
+  id: HelpCenterView
+  label: string
+  description: string
+}[] = [
+  {
+    id: "patient",
+    label: "Patient Help Center",
+    description: "Care, prescriptions, coverage, and account support",
+  },
+  {
+    id: "business",
+    label: "Business Help Center",
+    description: "Benefits, implementation, reporting, and partner support",
+  },
+]
+
+const BUSINESS_TOPICS: {
+  id: string
+  label: string
+  description: string
+  icon: Icon
+}[] = [
+  {
+    id: "member-access",
+    label: "Member access",
+    description: "Enrollment, eligibility, and account access",
+    icon: UsersThree,
+  },
+  {
+    id: "implementation",
+    label: "Implementation",
+    description: "Launch planning and organization setup",
+    icon: BuildingOffice,
+  },
+  {
+    id: "reporting",
+    label: "Reporting",
+    description: "Utilization reports and program insights",
+    icon: ChartBar,
+  },
+  {
+    id: "billing",
+    label: "Billing",
+    description: "Invoices, payments, and contract questions",
+    icon: CreditCard,
+  },
+  {
+    id: "security",
+    label: "Security and compliance",
+    description: "Privacy, security reviews, and compliance",
+    icon: ShieldCheck,
+  },
+  {
+    id: "partner-support",
+    label: "Partner support",
+    description: "Get help from the business support team",
+    icon: Headset,
+  },
+]
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function uid(): string {
+  return Math.random().toString(36).slice(2)
 }
 
-function loadFromStorage<T>(key: string, fallback: T): T {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T) : fallback;
-  } catch {
-    return fallback;
-  }
+function botMsg(fields: Partial<Message>): Message {
+  return { id: uid(), role: "bot", ...fields }
 }
 
-function formatTimestamp(ts: number): string {
-  return new Date(ts).toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
+function userMsg(text: string): Message {
+  return { id: uid(), role: "user", text }
 }
 
-// Short preview of article content for card previews
-function excerpt(content: string, len = 100): string {
-  const clean = content
-    .replace(/^#.+$/gm, "")
-    .replace(/\s+/g, " ")
-    .trim();
-  return clean.length > len ? clean.slice(0, len).trim() + "…" : clean;
+function categoryLabel(cat: string): string {
+  return (
+    CATEGORY_LABELS[cat] ||
+    cat.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+  )
 }
 
-function readTime(content: string): number {
-  const words = content.trim().split(/\s+/).filter(Boolean).length;
-  return Math.max(1, Math.round(words / 200));
+function CategoryIcon({
+  category,
+  size = 20,
+}: {
+  category: string
+  size?: number
+}) {
+  const CategoryIconComponent = CATEGORY_ICONS[category] || Info
+  return (
+    <CategoryIconComponent size={size} weight="regular" aria-hidden="true" />
+  )
 }
 
-// Parse frontmatter from markdown
-function parseFrontmatter(content: string): { frontmatter: Record<string, any>; body: string } {
-  const match = content.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
-  if (!match) return { frontmatter: {}, body: content };
+// ─── Markdown renderer (simple) ───────────────────────────────────────────────
 
-  const frontmatterStr = match[1];
-  const body = match[2];
-  const frontmatter: Record<string, any> = {};
+function SimpleMarkdown({ content }: { content: string }) {
+  const lines = content.split("\n")
+  const elements: React.ReactNode[] = []
+  let i = 0
 
-  frontmatterStr.split("\n").forEach((line) => {
-    const [key, ...value] = line.split(":");
-    if (key && value.length > 0) {
-      const trimmedKey = key.trim();
-      let trimmedValue = value.join(":").trim();
-
-      if (trimmedValue.startsWith("[") && trimmedValue.endsWith("]")) {
-        trimmedValue = trimmedValue.slice(1, -1);
-        frontmatter[trimmedKey] = trimmedValue
-          .split(",")
-          .map((v) => v.trim().replace(/^["']|["']$/g, ""));
-      } else {
-        frontmatter[trimmedKey] = trimmedValue.replace(/^["']|["']$/g, "");
+  while (i < lines.length) {
+    const line = lines[i]
+    if (line.startsWith("# ")) {
+      elements.push(
+        <h1 key={i} className="hc-md-h1">
+          {line.slice(2)}
+        </h1>,
+      )
+    } else if (line.startsWith("## ")) {
+      elements.push(
+        <h2 key={i} className="hc-md-h2">
+          {line.slice(3)}
+        </h2>,
+      )
+    } else if (line.startsWith("### ")) {
+      elements.push(
+        <h3 key={i} className="hc-md-h3">
+          {line.slice(4)}
+        </h3>,
+      )
+    } else if (line.startsWith("- ") || line.startsWith("* ")) {
+      const items: string[] = []
+      while (
+        i < lines.length &&
+        (lines[i].startsWith("- ") || lines[i].startsWith("* "))
+      ) {
+        items.push(lines[i].slice(2))
+        i++
       }
-    }
-  });
-
-  return { frontmatter, body };
-}
-
-// Extract questions from markdown headings
-function extractQuestions(content: string): string[] {
-  const questionRegex = /^## (.+)$/gm;
-  const questions: string[] = [];
-  let match;
-  while ((match = questionRegex.exec(content)) !== null) {
-    questions.push(match[1].trim());
-  }
-  return questions;
-}
-
-// Load articles from public KB
-async function loadArticles(): Promise<Article[]> {
-  const articles: Article[] = [];
-
-  for (const category of CATEGORIES) {
-    try {
-      const indexResponse = await fetch(`/kb-index-${category.id}.json`);
-      if (!indexResponse.ok) continue;
-
-      const fileNames: string[] = await indexResponse.json();
-
-      for (const fileName of fileNames) {
-        const fileResponse = await fetch(`/${category.id}/${fileName}`);
-        if (!fileResponse.ok) continue;
-
-        const content = await fileResponse.text();
-        const { frontmatter, body } = parseFrontmatter(content);
-        const questions = extractQuestions(body);
-
-        articles.push({
-          id: fileName.replace(".md", ""),
-          title: frontmatter.title || fileName,
-          category: category.id,
-          tags: frontmatter.tags || [],
-          content: body,
-          fileName,
-          questions,
-        });
-      }
-    } catch (error) {
-      console.error(`Error loading articles for ${category.id}:`, error);
-    }
-  }
-
-  return articles;
-}
-
-// Search articles by keyword
-function searchArticles(articles: Article[], query: string): Article[] {
-  const keywords = query.toLowerCase().split(/\s+/);
-  const scored = articles.map((article) => {
-    let score = 0;
-    keywords.forEach((kw) => {
-      if (article.title.toLowerCase().includes(kw)) score += 3;
-      if (article.tags.some((t) => t.includes(kw))) score += 2;
-      if (article.questions.some((q) => q.toLowerCase().includes(kw))) score += 2;
-      if (article.content.toLowerCase().includes(kw)) score += 1;
-    });
-    return { article, score };
-  });
-
-  return scored
-    .filter((s) => s.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 5)
-    .map((s) => s.article);
-}
-
-export default function App() {
-  const [popupOpen, setPopupOpen] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [threadActive, setThreadActive] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [articles, setArticles] = useState<Article[]>([]);
-  const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
-  const [activeTab, setActiveTab] = useState<"conversation" | "articles">("conversation");
-  const [isLoading, setIsLoading] = useState(true);
-  const [recentSearches, setRecentSearches] = useState<string[]>(() =>
-    loadFromStorage(RECENT_SEARCHES_KEY, [])
-  );
-  const [savedConversations, setSavedConversations] = useState<SavedConversation[]>(() =>
-    loadFromStorage(SAVED_CONVERSATIONS_KEY, [])
-  );
-  const [canvasMode, setCanvasMode] = useState(false);
-  const [currentScenario, setCurrentScenario] = useState<ScenarioType | null>(null);
-  const [shareMenuOpen, setShareMenuOpen] = useState(false);
-
-  const composerRef = useRef<HTMLInputElement>(null);
-  const threadRef = useRef<HTMLDivElement>(null);
-  const shareMenuRef = useRef<HTMLDivElement>(null);
-
-  const isFullscreenRef = useRef(isFullscreen);
-  const messagesRef = useRef(messages);
-  isFullscreenRef.current = isFullscreen;
-  messagesRef.current = messages;
-
-  // Load KB on mount
-  useEffect(() => {
-    document.title = "MDLIVE Help Center — Powered by Ask MD Live";
-    loadArticles()
-      .then((loadedArticles) => {
-        setArticles(loadedArticles);
-        setIsLoading(false);
-      })
-      .catch((error) => {
-        console.error("Error loading KB:", error);
-        setIsLoading(false);
-      });
-  }, []);
-
-  useEffect(() => {
-    if (popupOpen) composerRef.current?.focus();
-  }, [popupOpen]);
-
-  useEffect(() => {
-    if (threadRef.current) {
-      threadRef.current.scrollTop = threadRef.current.scrollHeight;
-    }
-  }, [messages]);
-
-  useEffect(() => {
-    if (!popupOpen) {
-      clearRoute();
-      return;
-    }
-    if (isFullscreen) {
-      setRoute(threadActive ? "conversation" : "home", true);
+      elements.push(
+        <ul key={`ul-${i}`} className="hc-md-ul">
+          {items.map((item, j) => (
+            <li key={j}>{item}</li>
+          ))}
+        </ul>,
+      )
+      continue
+    } else if (line.trim() === "") {
+      // skip blank lines between blocks
     } else {
-      clearRoute();
+      elements.push(
+        <p key={i} className="hc-md-p">
+          {line}
+        </p>,
+      )
     }
-  }, [popupOpen, isFullscreen, threadActive]);
+    i++
+  }
 
-  const handleHashChange = useCallback(() => {
-    if (!isFullscreenRef.current) return;
-    const route = window.location.hash;
-    if (route === "#/conversation" && messagesRef.current.length > 0) {
-      setThreadActive(true);
-    } else {
-      setThreadActive(false);
-    }
-  }, []);
+  return <div className="hc-md">{elements}</div>
+}
+
+// ─── Article Card ─────────────────────────────────────────────────────────────
+
+function ArticleCard({
+  article,
+  onOpen,
+}: {
+  article: Article
+  onOpen: (a: Article) => void
+}) {
+  return (
+    <div className="hc-article-card" onClick={() => onOpen(article)}>
+      <div className="hc-article-card__cat">
+        {categoryLabel(article.category)}
+      </div>
+      <div className="hc-article-card__title">{article.title}</div>
+      <div className="hc-article-card__arrow">
+        <ArrowRight size={16} aria-hidden="true" />
+      </div>
+    </div>
+  )
+}
+
+// ─── Greeting Screen ──────────────────────────────────────────────────────────
+
+function GreetingScreen({
+  onCategory,
+  onCondition,
+  onSmartFlow,
+}: {
+  onCategory: (cat: string) => void
+  onCondition: (key: string, smartNodeId?: string) => void
+  onSmartFlow: () => void
+}) {
+  return (
+    <div className="hc-greeting">
+      <div className="hc-greeting__hero">
+        <div className="hc-greeting__avatar">MD</div>
+        <div>
+          <div className="hc-greeting__name">MDlive Assistant</div>
+          <div className="hc-greeting__tagline">How can I help you today?</div>
+        </div>
+      </div>
+
+      <div className="hc-greeting__section-label">Browse by topic</div>
+      <div className="hc-greeting__chips">
+        {KB_CATEGORIES.map((cat) => (
+          <button key={cat} className="hc-chip" onClick={() => onCategory(cat)}>
+            <span className="hc-chip__icon">
+              <CategoryIcon category={cat} size={16} />
+            </span>
+            {categoryLabel(cat)}
+          </button>
+        ))}
+      </div>
+
+      <div className="hc-greeting__section-label">Ask about conditions</div>
+      <div className="hc-greeting__chips">
+        {CONDITIONS.map((c) => (
+          <button
+            key={c.key}
+            className="hc-chip"
+            onClick={() => onCondition(c.key, c.smartNodeId)}
+          >
+            {c.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="hc-greeting__cta">
+        <button className="hc-btn-primary" onClick={onSmartFlow}>
+          Ask MD Live
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function BusinessGreetingScreen({
+  onTopic,
+}: {
+  onTopic: (topic: (typeof BUSINESS_TOPICS)[number]) => void
+}) {
+  return (
+    <div className="hc-greeting">
+      <div className="hc-greeting__hero">
+        <div className="hc-greeting__avatar">MD</div>
+        <div>
+          <div className="hc-greeting__name">MDlive Business Support</div>
+          <div className="hc-greeting__tagline">
+            How can we support your organization?
+          </div>
+        </div>
+      </div>
+
+      <div className="hc-greeting__section-label">Business support topics</div>
+      <div className="hc-greeting__chips">
+        {BUSINESS_TOPICS.map((topic) => {
+          const TopicIcon = topic.icon
+          return (
+            <button
+              key={topic.id}
+              className="hc-chip"
+              onClick={() => onTopic(topic)}
+            >
+              <span className="hc-chip__icon">
+                <TopicIcon size={16} aria-hidden="true" />
+              </span>
+              {topic.label}
+            </button>
+          )
+        })}
+      </div>
+
+      <div className="hc-business-notice">
+        Business knowledge-base content is being prepared. Choose a topic to
+        contact the appropriate support team.
+      </div>
+    </div>
+  )
+}
+
+// ─── Message Bubble ───────────────────────────────────────────────────────────
+
+function MessageBubble({
+  msg,
+  onChip,
+  onOpenArticle,
+}: {
+  msg: Message
+  onChip: (key: string, label: string, msgId: string) => void
+  onOpenArticle: (a: Article) => void
+}) {
+  if (msg.loading) {
+    return (
+      <div className="hc-msg hc-msg--bot">
+        <div className="hc-msg__avatar">MD</div>
+        <div className="hc-msg__bubble hc-msg__bubble--loading">
+          <span />
+          <span />
+          <span />
+        </div>
+      </div>
+    )
+  }
+
+  const isBot = msg.role === "bot"
+  return (
+    <div className={`hc-msg ${isBot ? "hc-msg--bot" : "hc-msg--user"}`}>
+      {isBot && <div className="hc-msg__avatar">MD</div>}
+      <div className="hc-msg__content">
+        {msg.text && (
+          <div
+            className={`hc-msg__bubble ${
+              msg.error ? "hc-msg__bubble--error" : ""
+            }`}
+          >
+            {msg.text}
+          </div>
+        )}
+        {msg.articles && msg.articles.length > 0 && (
+          <div className="hc-msg__articles">
+            {msg.articles.map((a) => (
+              <ArticleCard key={a.id} article={a} onOpen={onOpenArticle} />
+            ))}
+          </div>
+        )}
+        {msg.chips && msg.chips.length > 0 && (
+          <div className="hc-msg__chips">
+            {msg.chips.map((chip) => (
+              <button
+                key={chip.key}
+                className="hc-chip hc-chip--follow"
+                onClick={() => onChip(chip.key, chip.label, msg.id)}
+              >
+                {chip.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── Article Viewer ───────────────────────────────────────────────────────────
+
+function ArticleViewer({
+  article,
+  onClose,
+}: {
+  article: Article
+  onClose: () => void
+}) {
+  return (
+    <div className="hc-article-viewer">
+      <div className="hc-article-viewer__header">
+        <button className="hc-icon-btn" onClick={onClose}>
+          <ArrowLeft size={16} aria-hidden="true" />
+          Back
+        </button>
+        <div className="hc-article-viewer__cat">
+          {categoryLabel(article.category)}
+        </div>
+      </div>
+      <div className="hc-article-viewer__body">
+        <h1 className="hc-article-viewer__title">{article.title}</h1>
+        <SimpleMarkdown content={article.content} />
+      </div>
+    </div>
+  )
+}
+
+// ─── History Panel ────────────────────────────────────────────────────────────
+
+function HistoryPanel({
+  conversations,
+  onSelect,
+  onClear,
+}: {
+  conversations: { id: string; preview: string; ts: number }[]
+  onSelect: (id: string) => void
+  onClear: () => void
+}) {
+  return (
+    <div className="hc-history">
+      <div className="hc-history__header">
+        <span>Recent conversations</span>
+        {conversations.length > 0 && (
+          <button className="hc-text-btn" onClick={onClear}>
+            Clear all
+          </button>
+        )}
+      </div>
+      {conversations.length === 0 ? (
+        <div className="hc-history__empty">No saved conversations yet.</div>
+      ) : (
+        <div className="hc-history__list">
+          {conversations.map((c) => (
+            <button
+              key={c.id}
+              className="hc-history__item"
+              onClick={() => onSelect(c.id)}
+            >
+              <div className="hc-history__item-preview">{c.preview}</div>
+              <div className="hc-history__item-ts">
+                {new Date(c.ts).toLocaleDateString()}
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Help Center View Switcher ────────────────────────────────────────────────
+
+function HelpCenterSwitcher({
+  currentView,
+  onViewChange,
+}: {
+  currentView: HelpCenterView
+  onViewChange: (view: HelpCenterView) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const switcherRef = useRef<HTMLDivElement>(null)
+  const selectedView = HELP_CENTER_VIEWS.find((view) => view.id === currentView)!
 
   useEffect(() => {
-    window.addEventListener("hashchange", handleHashChange);
-    return () => window.removeEventListener("hashchange", handleHashChange);
-  }, [handleHashChange]);
+    if (!open) return
 
-  useEffect(() => {
-    const hash = window.location.hash;
-    if (hash === "#/home" || hash === "#/conversation") {
-      setPopupOpen(true);
-      setIsFullscreen(true);
-      if (hash === "#/conversation") setThreadActive(true);
+    const closeOnOutsideClick = (event: MouseEvent) => {
+      if (!switcherRef.current?.contains(event.target as Node)) setOpen(false)
     }
-  }, []);
-
-  useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape" && popupOpen) {
-        setPopupOpen(false);
-        setIsFullscreen(false);
-      }
-    }
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [popupOpen]);
-
-  useEffect(() => {
-    if (!shareMenuOpen) return;
-    function onPointerDown(e: MouseEvent) {
-      if (shareMenuRef.current && !shareMenuRef.current.contains(e.target as Node)) {
-        setShareMenuOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", onPointerDown);
-    return () => document.removeEventListener("mousedown", onPointerDown);
-  }, [shareMenuOpen]);
-
-  function toggleFullscreen() {
-    setIsFullscreen((f) => !f);
-  }
-
-  function recordSearch(q: string) {
-    setRecentSearches((prev) => {
-      const next = [q, ...prev.filter((s) => s.toLowerCase() !== q.toLowerCase())].slice(0, 8);
-      localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(next));
-      return next;
-    });
-  }
-
-  function recordSavedConversation(article: Article) {
-    const categoryName = CATEGORIES.find((c) => c.id === article.category)?.name ?? article.category;
-    setSavedConversations((prev) => {
-      const next = [
-        {
-          id: `${Date.now()}-${article.id}`,
-          title: article.title,
-          subtitle: `${categoryName} · MDLIVE`,
-          timestamp: Date.now(),
-          articleId: article.id,
-        },
-        ...prev.filter((c) => c.articleId !== article.id),
-      ].slice(0, 8);
-      localStorage.setItem(SAVED_CONVERSATIONS_KEY, JSON.stringify(next));
-      return next;
-    });
-  }
-
-  // Show a category's articles as chips, continuing the current thread
-  function showCategoryArticles(categoryId: string, userLabel: string) {
-    setThreadActive(true);
-    setActiveTab("conversation");
-    const userMsg: Message = { who: "user", text: userLabel, id: msgId++ };
-    const typingMsg: Message = { who: "typing", text: "...", id: msgId++ };
-    setMessages((prev) => [...prev, userMsg, typingMsg]);
-
-    setTimeout(() => {
-      const categoryArticles = articles.filter((a) => a.category === categoryId);
-      const categoryName = CATEGORIES.find((c) => c.id === categoryId)?.name ?? categoryId;
-      const botMsg: Message = {
-        who: "bot",
-        text: `Here are our ${categoryName} topics. Which one fits best?`,
-        id: msgId++,
-        chips: categoryArticles.map((a) => ({
-          key: a.id,
-          label: a.title,
-          onClick: () => selectSubtopic(a),
-        })),
-      };
-      setMessages((prev) => prev.filter((m) => m.who !== "typing").concat(botMsg));
-    }, 500);
-  }
-
-  function selectCategoryChip(categoryId: string) {
-    const categoryName = CATEGORIES.find((c) => c.id === categoryId)?.name ?? categoryId;
-    showCategoryArticles(categoryId, categoryName);
-  }
-
-  // User picked a specific article chip — confirm, then show the article as a rich card
-  function selectSubtopic(article: Article) {
-    const userMsg: Message = { who: "user", text: article.title, id: msgId++ };
-    const typingMsg: Message = { who: "typing", text: "...", id: msgId++ };
-    setMessages((prev) => [...prev, userMsg, typingMsg]);
-
-    setTimeout(() => {
-      const introMsg: Message = { who: "bot", text: "Ok, I think this article might help.", id: msgId++ };
-      const sourceMsg: Message = {
-        who: "bot",
-        text: "Here's a relevant article from MDLIVE.",
-        id: msgId++,
-      };
-      const cardMsg: Message = { who: "bot", text: "", id: msgId++, article };
-      const nextStepsMsg: Message = {
-        who: "bot",
-        text: "What would you like to do next?",
-        id: msgId++,
-        chips: [
-          { key: "learn-more", label: "Learn about other services", onClick: handleLearnMore },
-          { key: "reset", label: "Back to main menu", onClick: handleReset },
-        ],
-      };
-      setMessages((prev) =>
-        prev.filter((m) => m.who !== "typing").concat(introMsg, sourceMsg, cardMsg, nextStepsMsg)
-      );
-      recordSavedConversation(article);
-    }, 600);
-  }
-
-  // Render any node in the SMART_FLOW tree. If userEchoLabel is provided, first post a user
-  // bubble + typing indicator (chip-driven entry); if omitted, post the bot turn directly
-  // with no preceding user bubble (the very first, unprompted "Ask MD Live" turn).
-  function goToSmartNode(nodeId: string, userEchoLabel?: string) {
-    const node = ALL_SMART_NODES[nodeId];
-    if (!node) return;
-
-    setThreadActive(true);
-    setActiveTab("conversation");
-
-    const render = () => {
-      const chips: ChipOption[] | undefined = node.chips?.map((c) => ({
-        key: c.key,
-        label: c.label,
-        onClick: () => resolveSmartChip(c),
-      }));
-      const botMsg: Message = { who: "bot", text: node.text, id: msgId++, chips };
-      setMessages((prev) => prev.filter((m) => m.who !== "typing").concat(botMsg));
-    };
-
-    if (userEchoLabel) {
-      const userMsg: Message = { who: "user", text: userEchoLabel, id: msgId++ };
-      const typingMsg: Message = { who: "typing", text: "...", id: msgId++ };
-      setMessages((prev) => [...prev, userMsg, typingMsg]);
-    } else {
-      const typingMsg: Message = { who: "typing", text: "...", id: msgId++ };
-      setMessages((prev) => [...prev, typingMsg]);
-    }
-    setTimeout(render, 500);
-  }
-
-  // Dispatch a single chip's action: navigate within the tree, escape to an existing flow,
-  // or resolve+open a real Article by id (explicit "Read the full article" request).
-  function resolveSmartChip(chip: SmartChip) {
-    if (chip.articleId) {
-      const article = articles.find((a) => a.id === chip.articleId);
-      if (article) selectSubtopic(article);
-      return;
-    }
-    if (chip.action === "reset") return handleReset();
-    if (chip.action === "learn-more") return handleLearnMore();
-    if (chip.action === "category:pediatric-care") {
-      return showCategoryArticles("pediatric-care", "Show Pediatric Care topics");
-    }
-    if (chip.action === "blog-placeholder") {
-      const botMsg: Message = {
-        who: "bot",
-        text: "This would link out to the full MD Live blog article on this topic — link coming soon!",
-        id: msgId++,
-      };
-      setMessages((prev) => [...prev, botMsg]);
-      return;
-    }
-    if (chip.goTo) return goToSmartNode(chip.goTo, chip.label);
-  }
-
-  function showConditionsMenu() {
-    setThreadActive(true);
-    setActiveTab("conversation");
-    const userMsg: Message = { who: "user", text: "Ask about conditions", id: msgId++ };
-    const typingMsg: Message = { who: "typing", text: "...", id: msgId++ };
-    setMessages((prev) => [...prev, userMsg, typingMsg]);
-
-    setTimeout(() => {
-      const botMsg: Message = {
-        who: "bot",
-        text: "Sure — which condition would you like to talk about?",
-        id: msgId++,
-        chips: CONDITIONS.map((c) => ({
-          key: c.key,
-          label: c.label,
-          onClick: () => goToSmartNode(c.nodeId, c.label),
-        })),
-      };
-      setMessages((prev) => prev.filter((m) => m.who !== "typing").concat(botMsg));
-    }, 500);
-  }
-
-  function handleLearnMore() {
-    const userMsg: Message = { who: "user", text: "Learn about other services", id: msgId++ };
-    const typingMsg: Message = { who: "typing", text: "...", id: msgId++ };
-    setMessages((prev) => [...prev, userMsg, typingMsg]);
-
-    setTimeout(() => {
-      const botMsg: Message = {
-        who: "bot",
-        text: "Sure — which area would you like to explore?",
-        id: msgId++,
-        chips: CATEGORIES.map((c) => ({
-          key: c.id,
-          label: c.name,
-          onClick: () => selectCategoryChip(c.id),
-        })),
-      };
-      setMessages((prev) => prev.filter((m) => m.who !== "typing").concat(botMsg));
-    }, 500);
-  }
-
-  function enterCanvasMode() {
-    setCanvasMode(true);
-    setPopupOpen(true);
-    setMessages([]);
-    setThreadActive(false);
-    setSelectedArticle(null);
-    setCurrentScenario("default");
-  }
-
-  function exitCanvasMode() {
-    setCanvasMode(false);
-    setPopupOpen(false);
-    setCurrentScenario(null);
-    setMessages([]);
-    setThreadActive(false);
-    setSelectedArticle(null);
-    setShareMenuOpen(false);
-  }
-
-  function handleScenarioChange(scenarioId: string) {
-    setCurrentScenario(scenarioId as ScenarioType);
-    setMessages([]);
-    setThreadActive(false);
-    setSelectedArticle(null);
-  }
-
-  function selectScenario(scenarioId: ScenarioType) {
-    handleScenarioChange(scenarioId);
-    setShareMenuOpen(false);
-  }
-
-  function ask(q: string) {
-    if (!q || !q.trim()) return;
-
-    // If in canvas mode, reset thread for fresh scenario testing
-    if (canvasMode) {
-      setMessages([]);
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false)
     }
 
-    setThreadActive(true);
-    setActiveTab("conversation");
-    recordSearch(q.trim());
-    const userMsg: Message = { who: "user", text: q, id: msgId++ };
-    const typingMsg: Message = { who: "typing", text: "...", id: msgId++ };
-    setMessages((prev) => [...prev, userMsg, typingMsg]);
-
-    // Determine delay and search function based on scenario
-    let delay = 700;
-    let results: Article[] = [];
-    let kbAvailable = true;
-
-    if (canvasMode && currentScenario) {
-      const scenario = SCENARIOS[currentScenario];
-      delay = scenario.delay;
-      kbAvailable = scenario.kbAvailable;
-
-      if (!kbAvailable) {
-        results = [];
-      } else {
-        results = scenario.searchMock(q, articles);
-      }
-    } else {
-      results = searchArticles(articles, q);
+    document.addEventListener("mousedown", closeOnOutsideClick)
+    document.addEventListener("keydown", closeOnEscape)
+    return () => {
+      document.removeEventListener("mousedown", closeOnOutsideClick)
+      document.removeEventListener("keydown", closeOnEscape)
     }
-
-    setTimeout(() => {
-      let botMsg: Message;
-
-      if (results.length > 0) {
-        const categoryScores = new Map<string, number>();
-        results.forEach((a, i) => {
-          categoryScores.set(a.category, (categoryScores.get(a.category) ?? 0) + (results.length - i));
-        });
-        const relevantCategories = Array.from(categoryScores.keys()).sort(
-          (a, b) => (categoryScores.get(b) ?? 0) - (categoryScores.get(a) ?? 0)
-        );
-
-        // For multiple results scenario, show all 5 results
-        const displayArticles = canvasMode && currentScenario === "multiple" ? results : [results[0]];
-        const topArticle = displayArticles[0];
-        const suffix = displayArticles.length > 1 ? ` (and ${displayArticles.length - 1} more)` : "";
-
-        botMsg = {
-          who: "bot",
-          text: `I found "${topArticle.title}" which might help.${suffix} Would you like to read more?`,
-          id: msgId++,
-          chips: relevantCategories.map((catId) => ({
-            key: catId,
-            label: CATEGORIES.find((c) => c.id === catId)?.name ?? catId,
-            onClick: () => selectCategoryChip(catId),
-          })),
-        };
-      } else if (!kbAvailable) {
-        botMsg = {
-          who: "bot",
-          text: "⚠️ System Error: Knowledge base is currently unavailable. Please try again later.",
-          id: msgId++,
-        };
-      } else {
-        botMsg = {
-          who: "bot",
-          text: "I didn't find a match in our knowledge base. Please try another question or browse our categories.",
-          id: msgId++,
-        };
-      }
-
-      setMessages((prev) => prev.filter((m) => m.who !== "typing").concat(botMsg));
-    }, delay);
-  }
-
-  function handleSend() {
-    ask(input);
-    setInput("");
-  }
-
-  function handleComposerKey(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Enter") {
-      ask(input);
-      setInput("");
-    }
-  }
-
-  function handleBack() {
-    setThreadActive(false);
-    setSelectedArticle(null);
-    setActiveTab("conversation");
-  }
-
-  function handleReset() {
-    setMessages([]);
-    setThreadActive(false);
-    setSelectedArticle(null);
-    setActiveTab("conversation");
-  }
-
-  function handleClose() {
-    setPopupOpen(false);
-    setIsFullscreen(false);
-  }
-
-  function openArticle(article: Article) {
-    setSelectedArticle(article);
-    setActiveTab("articles");
-  }
-
-  function askMDLive() {
-    goToSmartNode("wh-menopause");
-  }
-
-  function openCategoryChat(categoryId: string, label: string) {
-    setPopupOpen(true);
-    showCategoryArticles(categoryId, label);
-  }
+  }, [open])
 
   return (
-    <div className={`hc-root${canvasMode ? " is-canvas-mode" : ""}`} style={{ width: "100%", minHeight: "100dvh" }}>
-      <div className="canvas-topbar">
-        <div className="canvas-topbar__toggle">
+    <div className="hc-view-switcher" ref={switcherRef}>
+      <button
+        className="hc-view-switcher__trigger"
+        onClick={() => setOpen((value) => !value)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
+        <span>{selectedView.label}</span>
+        <CaretDown
+          className={`hc-view-switcher__caret ${
+            open ? "hc-view-switcher__caret--open" : ""
+          }`}
+          size={16}
+          aria-hidden="true"
+        />
+      </button>
+      {open && (
+        <div
+          className="hc-view-switcher__menu"
+          role="menu"
+          aria-label="Help Center view"
+        >
+          <div className="hc-view-switcher__eyebrow">Choose your Help Center</div>
+          {HELP_CENTER_VIEWS.map((view) => {
+            const isSelected = view.id === currentView
+            return (
+              <button
+                key={view.id}
+                className={`hc-view-switcher__item ${
+                  isSelected ? "hc-view-switcher__item--selected" : ""
+                }`}
+                onClick={() => {
+                  onViewChange(view.id)
+                  setOpen(false)
+                }}
+                role="menuitemradio"
+                aria-checked={isSelected}
+              >
+                <span className="hc-view-switcher__check">
+                  {isSelected && (
+                    <Check size={16} weight="bold" aria-hidden="true" />
+                  )}
+                </span>
+                <span className="hc-view-switcher__copy">
+                  <span className="hc-view-switcher__name">{view.label}</span>
+                  <span className="hc-view-switcher__description">
+                    {view.description}
+                  </span>
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Canvas Topbar ────────────────────────────────────────────────────────────
+
+function CanvasTopbar({
+  currentScenario,
+  onScenarioChange,
+  mode,
+  onModeChange,
+}: {
+  currentScenario: ScenarioType
+  onScenarioChange: (scenario: ScenarioType) => void
+  mode: "edit" | "prototype"
+  onModeChange: (mode: "edit" | "prototype") => void
+}) {
+  const [scenarioMenuOpen, setScenarioMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+  const isEditMode = mode === "edit"
+  const selectedScenario = SCENARIOS[currentScenario]
+
+  useEffect(() => {
+    if (!isEditMode) setScenarioMenuOpen(false)
+  }, [isEditMode])
+
+  useEffect(() => {
+    if (!scenarioMenuOpen) return
+
+    const closeOnOutsideClick = (event: MouseEvent) => {
+      if (!menuRef.current?.contains(event.target as Node)) {
+        setScenarioMenuOpen(false)
+      }
+    }
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setScenarioMenuOpen(false)
+    }
+
+    document.addEventListener("mousedown", closeOnOutsideClick)
+    document.addEventListener("keydown", closeOnEscape)
+    return () => {
+      document.removeEventListener("mousedown", closeOnOutsideClick)
+      document.removeEventListener("keydown", closeOnEscape)
+    }
+  }, [scenarioMenuOpen])
+
+  return (
+    <div className="hc-canvas-bar">
+      <div className="hc-canvas-bar__left">
+        <span className="hc-canvas-bar__label">Testing canvas</span>
+        <div className="hc-mode-toggle" aria-label="Canvas mode">
           <button
-            className={`canvas-topbar__toggle-btn${canvasMode ? " is-active" : ""}`}
-            onClick={() => { if (!canvasMode) enterCanvasMode(); }}
+            className={`hc-mode-toggle__option ${
+              isEditMode ? "hc-mode-toggle__option--active" : ""
+            }`}
+            onClick={() => onModeChange("edit")}
+            aria-pressed={isEditMode}
           >
+            <PencilSimple size={14} aria-hidden="true" />
             Edit
           </button>
           <button
-            className={`canvas-topbar__toggle-btn${!canvasMode ? " is-active" : ""}`}
-            onClick={() => { if (canvasMode) exitCanvasMode(); }}
+            className={`hc-mode-toggle__option ${
+              !isEditMode ? "hc-mode-toggle__option--active" : ""
+            }`}
+            onClick={() => onModeChange("prototype")}
+            aria-pressed={!isEditMode}
           >
+            <Play size={14} weight="fill" aria-hidden="true" />
             Prototype
           </button>
         </div>
-        <div className="canvas-topbar__share" ref={shareMenuRef}>
+      </div>
+      <div className="hc-canvas-bar__right">
+        <span className="hc-canvas-bar__label">Scenario</span>
+        <div className="hc-scenario-picker" ref={menuRef}>
           <button
-            className="canvas-topbar__share-btn"
-            disabled={!canvasMode}
-            aria-expanded={shareMenuOpen}
-            onClick={() => setShareMenuOpen((v) => !v)}
+            className="hc-scenario-picker__trigger"
+            onClick={() => setScenarioMenuOpen((open) => !open)}
+            disabled={!isEditMode}
+            aria-haspopup="menu"
+            aria-expanded={scenarioMenuOpen}
+            title={
+              isEditMode
+                ? "Choose a test scenario"
+                : "Switch to Edit mode to change scenarios"
+            }
           >
-            {currentScenario ? SCENARIOS[currentScenario].name : "Share"}
-            <ArrowDown size={12} aria-hidden="true" />
+            <span>{selectedScenario.name}</span>
+            <CaretDown
+              className={`hc-scenario-picker__caret ${
+                scenarioMenuOpen ? "hc-scenario-picker__caret--open" : ""
+              }`}
+              size={14}
+              aria-hidden="true"
+            />
           </button>
-          {shareMenuOpen && canvasMode && (
-            <div className="canvas-topbar__menu">
-              {Object.entries(SCENARIOS).map(([key, scenario]) => (
-                <button
-                  key={key}
-                  className={`canvas-topbar__menu-item${currentScenario === key ? " is-selected" : ""}`}
-                  onClick={() => selectScenario(key as ScenarioType)}
-                >
-                  {scenario.name}
-                </button>
-              ))}
+          {scenarioMenuOpen && (
+            <div
+              className="hc-scenario-menu"
+              role="menu"
+              aria-label="Test scenarios"
+            >
+              {Object.values(SCENARIOS).map((scenario) => {
+                const isSelected = scenario.id === currentScenario
+                return (
+                  <button
+                    key={scenario.id}
+                    className={`hc-scenario-menu__item ${
+                      isSelected ? "hc-scenario-menu__item--selected" : ""
+                    }`}
+                    onClick={() => {
+                      onScenarioChange(scenario.id as ScenarioType)
+                      setScenarioMenuOpen(false)
+                    }}
+                    role="menuitemradio"
+                    aria-checked={isSelected}
+                  >
+                    <span className="hc-scenario-menu__check">
+                      {isSelected && (
+                        <Check size={15} weight="bold" aria-hidden="true" />
+                      )}
+                    </span>
+                    <span className="hc-scenario-menu__copy">
+                      <span className="hc-scenario-menu__name">
+                        {scenario.name}
+                      </span>
+                      <span className="hc-scenario-menu__description">
+                        {scenario.description}
+                      </span>
+                    </span>
+                  </button>
+                )
+              })}
             </div>
           )}
         </div>
       </div>
-      <div className="page">
-        <header className="header">
-          <div className="avatar" aria-hidden="true">
-            <User size={16} />
-          </div>
-          <button className="lang-select">
-            English (US) <ArrowDown size={14} aria-hidden="true" />
+    </div>
+  )
+}
+
+// ─── Main App ─────────────────────────────────────────────────────────────────
+
+export default function App() {
+  // Canvas
+  const [canvasMode, setCanvasMode] = useState<"edit" | "prototype">("edit")
+  const [currentScenario, setCurrentScenario] =
+    useState<ScenarioType>("default")
+  const [helpCenterView, setHelpCenterView] =
+    useState<HelpCenterView>("patient")
+
+  // KB
+  const [articles, setArticles] = useState<Article[]>([])
+  const [kbLoaded, setKbLoaded] = useState(false)
+
+  // Popup
+  const [popupOpen, setPopupOpen] = useState(false)
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  const [activeTab, setActiveTab] = useState<"conversation" | "articles">(
+    "conversation",
+  )
+
+  // Chat state
+  const [messages, setMessages] = useState<Message[]>([])
+  const [threadActive, setThreadActive] = useState(false)
+  const [composerValue, setComposerValue] = useState("")
+  const [isTyping, setIsTyping] = useState(false)
+
+  // Article viewer
+  const [viewingArticle, setViewingArticle] = useState<Article | null>(null)
+
+  // History
+  const [conversations, setConversations] = useState<{
+    id: string
+    preview: string
+    ts: number
+  }[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("hc-conversations") || "[]")
+    } catch {
+      return []
+    }
+  })
+
+  // Search (articles tab)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [searchResults, setSearchResults] = useState<Article[]>([])
+
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const composerRef = useRef<HTMLInputElement>(null)
+
+  // ── Load KB ────────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    const scenario = SCENARIOS[currentScenario]
+    if (!scenario.kbAvailable) {
+      setArticles([])
+      setKbLoaded(true)
+      return
+    }
+    fetchArticles(KB_CATEGORIES)
+      .then((arts) => {
+        setArticles(arts)
+        setKbLoaded(true)
+      })
+      .catch(() => {
+        setArticles([])
+        setKbLoaded(true)
+      })
+  }, [currentScenario])
+
+  // ── Scroll to bottom ───────────────────────────────────────────────────────
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [messages])
+
+  // ── Save conversations ─────────────────────────────────────────────────────
+
+  useEffect(() => {
+    localStorage.setItem("hc-conversations", JSON.stringify(conversations))
+  }, [conversations])
+
+  // ── Search ─────────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setSearchResults([])
+      return
+    }
+    if (helpCenterView === "business") {
+      setSearchResults([])
+      return
+    }
+    const scenario = SCENARIOS[currentScenario]
+    const results = scenario.searchMock(searchQuery, articles)
+    setSearchResults(results)
+  }, [searchQuery, articles, currentScenario, helpCenterView])
+
+  // ── Bot utilities ──────────────────────────────────────────────────────────
+
+  const addMsg = useCallback((msg: Message) => {
+    setMessages((prev) => [...prev, msg])
+  }, [])
+
+  const replaceLoadingMsg = useCallback(
+    (msgId: string, fields: Partial<Message>) => {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === msgId ? { ...m, loading: false, ...fields } : m,
+        ),
+      )
+    },
+    [],
+  )
+
+  const delay = useCallback(
+    (ms: number) => new Promise<void>((r) => setTimeout(r, ms)),
+    [],
+  )
+
+  // ── Smart flow ─────────────────────────────────────────────────────────────
+
+  const sendSmartNode = useCallback(
+    async (nodeId: string) => {
+      const node: SmartNode | undefined = SMART_FLOW[nodeId]
+      if (!node) return
+      const scenario = SCENARIOS[currentScenario]
+
+      const loadingId = uid()
+      addMsg({ id: loadingId, role: "bot", loading: true })
+      await delay(scenario.delay)
+
+      replaceLoadingMsg(loadingId, {
+        text: node.text,
+        chips: node.chips?.map((c) => ({ key: c.key, label: c.label })),
+        smartNodeId: nodeId,
+      })
+    },
+    [currentScenario, addMsg, delay, replaceLoadingMsg],
+  )
+
+  const resolveSmartChip = useCallback(
+    async (chipKey: string, chipLabel: string, msgId: string) => {
+      // Find the source message to look up the node
+      setMessages((prev) => {
+        const srcMsg = prev.find((m) => m.id === msgId)
+        if (!srcMsg?.smartNodeId) return prev
+        const node = SMART_FLOW[srcMsg.smartNodeId]
+        if (!node?.chips) return prev
+        const chip = node.chips.find((c) => c.key === chipKey)
+        if (!chip) return prev
+        return prev // actual navigation happens below
+      })
+
+      // Add user echo
+      addMsg(userMsg(chipLabel))
+
+      // Resolve the chip action
+      const srcMsg = messages.find((m) => m.id === msgId)
+      if (!srcMsg?.smartNodeId) return
+      const node = SMART_FLOW[srcMsg.smartNodeId]
+      if (!node?.chips) return
+      const chip = node.chips.find((c) => c.key === chipKey)
+      if (!chip) return
+
+      if (chip.goTo) {
+        await sendSmartNode(chip.goTo)
+      } else if (chip.action === "reset") {
+        setThreadActive(false)
+        setMessages([])
+      } else if (chip.action === "learn-more") {
+        setActiveTab("articles")
+      } else if (chip.action === "category:pediatric-care") {
+        await sendCategoryMsg("pediatric-care")
+      } else if (chip.articleId) {
+        const article = articles.find((a) => a.id === chip.articleId)
+        if (article) {
+          setViewingArticle(article)
+        } else {
+          addMsg(
+            botMsg({
+              text: "I couldn't find that article right now. Try searching for it.",
+            }),
+          )
+        }
+      }
+    },
+    [messages, articles, sendSmartNode, addMsg],
+  )
+
+  // ── Category / search flows ────────────────────────────────────────────────
+
+  const sendCategoryMsg = useCallback(
+    async (cat: string) => {
+      const scenario = SCENARIOS[currentScenario]
+      const catArticles = articles.filter((a) => a.category === cat).slice(0, 4)
+
+      const loadingId = uid()
+      addMsg({ id: loadingId, role: "bot", loading: true })
+      await delay(scenario.delay)
+
+      if (!scenario.kbAvailable || articles.length === 0) {
+        replaceLoadingMsg(loadingId, {
+          text: "I'm having trouble loading articles right now. Please try again in a moment.",
+          error: true,
+        })
+        return
+      }
+
+      if (catArticles.length === 0) {
+        replaceLoadingMsg(loadingId, {
+          text: `I don't have any articles for ${categoryLabel(cat)} yet. Try a different topic or search above.`,
+        })
+        return
+      }
+
+      replaceLoadingMsg(loadingId, {
+        text: `Here are some articles on ${categoryLabel(cat)}:`,
+        articles: catArticles,
+      })
+    },
+    [currentScenario, articles, addMsg, delay, replaceLoadingMsg],
+  )
+
+  const sendSearchMsg = useCallback(
+    async (query: string) => {
+      const scenario = SCENARIOS[currentScenario]
+      const loadingId = uid()
+      addMsg({ id: loadingId, role: "bot", loading: true })
+      await delay(scenario.delay)
+
+      if (helpCenterView === "business") {
+        replaceLoadingMsg(loadingId, {
+          text: "Business Help Center articles are being prepared. Contact your MDlive account team for organization-specific support.",
+          chips: [{ key: "reset", label: "Start over" }],
+        })
+        return
+      }
+
+      if (!scenario.kbAvailable) {
+        replaceLoadingMsg(loadingId, {
+          text: "The knowledge base is unavailable right now. Please try again later.",
+          error: true,
+        })
+        return
+      }
+
+      const results = scenario.searchMock(query, articles)
+
+      if (results.length === 0) {
+        replaceLoadingMsg(loadingId, {
+          text: "I couldn't find any articles matching your question. Try rephrasing, or contact support at 1-800-400-6354.",
+          chips: [{ key: "reset", label: "Start over" }],
+        })
+        return
+      }
+
+      replaceLoadingMsg(loadingId, {
+        text: `Here's what I found for "${query}":`,
+        articles: results,
+      })
+    },
+    [
+      currentScenario,
+      articles,
+      helpCenterView,
+      addMsg,
+      delay,
+      replaceLoadingMsg,
+    ],
+  )
+
+  // ── Submit message ─────────────────────────────────────────────────────────
+
+  const handleSubmit = useCallback(async () => {
+    const q = composerValue.trim()
+    if (!q || isTyping) return
+    setComposerValue("")
+    setIsTyping(true)
+
+    if (!threadActive) setThreadActive(true)
+    addMsg(userMsg(q))
+    await sendSearchMsg(q)
+
+    setIsTyping(false)
+  }, [composerValue, isTyping, threadActive, addMsg, sendSearchMsg])
+
+  // ── Greeting chip handlers ─────────────────────────────────────────────────
+
+  const handleCategory = useCallback(
+    async (cat: string) => {
+      if (!threadActive) setThreadActive(true)
+      addMsg(userMsg(`Tell me about ${categoryLabel(cat)}`))
+      await sendCategoryMsg(cat)
+    },
+    [threadActive, addMsg, sendCategoryMsg],
+  )
+
+  const handleBusinessTopic = useCallback(
+    async (topic: (typeof BUSINESS_TOPICS)[number]) => {
+      if (!threadActive) setThreadActive(true)
+      addMsg(userMsg(topic.label))
+
+      const loadingId = uid()
+      addMsg({ id: loadingId, role: "bot", loading: true })
+      await delay(SCENARIOS[currentScenario].delay)
+      replaceLoadingMsg(loadingId, {
+        text: `For help with ${topic.label.toLowerCase()}, contact your MDlive account team. Business knowledge-base resources for this topic are coming soon.`,
+        chips: [{ key: "reset", label: "Choose another topic" }],
+      })
+    },
+    [
+      threadActive,
+      currentScenario,
+      addMsg,
+      delay,
+      replaceLoadingMsg,
+    ],
+  )
+
+  const handleCondition = useCallback(
+    async (key: string, smartNodeId?: string) => {
+      if (!threadActive) setThreadActive(true)
+      addMsg(userMsg(key.charAt(0).toUpperCase() + key.slice(1)))
+      if (smartNodeId) {
+        await sendSmartNode(smartNodeId)
+      } else {
+        await sendSearchMsg(key)
+      }
+    },
+    [threadActive, addMsg, sendSmartNode, sendSearchMsg],
+  )
+
+  const handleSmartFlow = useCallback(async () => {
+    if (!threadActive) setThreadActive(true)
+    addMsg(userMsg("Ask MD Live"))
+    await sendSmartNode("wh-menopause")
+  }, [threadActive, addMsg, sendSmartNode])
+
+  // ── Chip clicked (from message) ────────────────────────────────────────────
+
+  const handleChip = useCallback(
+    async (key: string, label: string, msgId: string) => {
+      if (key === "reset") {
+        setThreadActive(false)
+        setMessages([])
+        return
+      }
+
+      // Check if this is a smart flow chip
+      const srcMsg = messages.find((m) => m.id === msgId)
+      if (srcMsg?.smartNodeId) {
+        await resolveSmartChip(key, label, msgId)
+        return
+      }
+
+      // Generic chip — treat as search
+      addMsg(userMsg(label))
+      await sendSearchMsg(label)
+    },
+    [messages, resolveSmartChip, addMsg, sendSearchMsg],
+  )
+
+  // ── Save / restore conversation ────────────────────────────────────────────
+
+  const saveConversation = useCallback(() => {
+    if (messages.length === 0) return
+    const id = uid()
+    const preview =
+      messages.find((m) => m.role === "user")?.text?.slice(0, 60) ||
+      "Conversation"
+    setConversations((prev) => [
+      { id, preview, ts: Date.now() },
+      ...prev.slice(0, 9),
+    ])
+  }, [messages])
+
+  const clearConversations = useCallback(() => setConversations([]), [])
+
+  // ── Keyboard ───────────────────────────────────────────────────────────────
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault()
+        handleSubmit()
+      }
+    },
+    [handleSubmit],
+  )
+
+  // ── Render popup content ───────────────────────────────────────────────────
+
+  function renderConversationTab() {
+    if (viewingArticle) {
+      return (
+        <ArticleViewer
+          article={viewingArticle}
+          onClose={() => setViewingArticle(null)}
+        />
+      )
+    }
+
+    if (!threadActive) {
+      if (helpCenterView === "business") {
+        return <BusinessGreetingScreen onTopic={handleBusinessTopic} />
+      }
+      return (
+        <GreetingScreen
+          onCategory={handleCategory}
+          onCondition={handleCondition}
+          onSmartFlow={handleSmartFlow}
+        />
+      )
+    }
+
+    return (
+      <div className="hc-thread">
+        <div className="hc-thread__messages">
+          {messages.map((msg) => (
+            <MessageBubble
+              key={msg.id}
+              msg={msg}
+              onChip={handleChip}
+              onOpenArticle={setViewingArticle}
+            />
+          ))}
+          <div ref={messagesEndRef} />
+        </div>
+        <div className="hc-thread__actions">
+          <button
+            className="hc-text-btn"
+            onClick={() => {
+              saveConversation()
+              setThreadActive(false)
+              setMessages([])
+            }}
+          >
+            Save &amp; start over
           </button>
-        </header>
+        </div>
+      </div>
+    )
+  }
 
-        {!popupOpen && !selectedArticle && (
-          <>
-            <section className="hero">
-              <div className="logo-placeholder" aria-hidden="true">
-                <Sparkle size={22} />
-              </div>
-              <h2>Ask MDLIVE</h2>
-              <p className="hero-description">Help Center Chat</p>
+  function renderArticlesTab() {
+    if (helpCenterView === "business") {
+      return (
+        <div className="hc-articles-tab">
+          <div className="hc-articles-tab__search">
+            <input
+              className="hc-input"
+              placeholder="Search business support..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+          <div className="hc-business-empty">
+            <Headset size={28} aria-hidden="true" />
+            <div className="hc-business-empty__title">
+              Business resources are coming soon
+            </div>
+            <div className="hc-business-empty__copy">
+              Contact your MDlive account team for benefits, implementation,
+              reporting, billing, or technical support.
+            </div>
+            <button
+              className="hc-btn-primary"
+              onClick={() => {
+                setActiveTab("conversation")
+                setSearchQuery("")
+              }}
+            >
+              View support topics
+            </button>
+          </div>
+        </div>
+      )
+    }
 
-              <div className="search-bar">
-                <input
-                  className="search-bar__input"
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search articles..."
-                  aria-label="Search help topics"
-                />
-                <button className="btn-circle" aria-label="Search">
-                  <ArrowUp size={16} />
+    return (
+      <div className="hc-articles-tab">
+        <div className="hc-articles-tab__search">
+          <input
+            className="hc-input"
+            placeholder="Search articles..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+        {searchQuery && searchResults.length === 0 && (
+          <div className="hc-articles-tab__empty">
+            No results for "{searchQuery}".
+          </div>
+        )}
+        {searchResults.length > 0 && (
+          <div className="hc-articles-tab__results">
+            {searchResults.map((a) => (
+              <ArticleCard key={a.id} article={a} onOpen={setViewingArticle} />
+            ))}
+          </div>
+        )}
+        {!searchQuery && (
+          <div className="hc-articles-tab__categories">
+            {KB_CATEGORIES.map((cat) => {
+              const count = articles.filter((a) => a.category === cat).length
+              return (
+                <button
+                  key={cat}
+                  className="hc-category-row"
+                  onClick={() => {
+                    setActiveTab("conversation")
+                    handleCategory(cat)
+                  }}
+                >
+                  <span className="hc-category-row__icon">
+                    <CategoryIcon category={cat} size={19} />
+                  </span>
+                  <span className="hc-category-row__label">
+                    {categoryLabel(cat)}
+                  </span>
+                  <span className="hc-category-row__count">{count}</span>
+                  <span className="hc-category-row__arrow">
+                    <ArrowRight size={16} aria-hidden="true" />
+                  </span>
                 </button>
-              </div>
-
-              {searchQuery && (
-                <div className="autocomplete">
-                  <MagnifyingGlass size={16} aria-hidden="true" />
-                  <span>{searchQuery}</span>
-                </div>
-              )}
-
-              <p className="legal">
-                Browse our <span className="link">health topics</span> below or ask a question.
-              </p>
-            </section>
-
-            <section className="topics">
-              <h3>Categories</h3>
-              <div className="topics__grid">
-                {CATEGORIES.map((cat) => (
-                  <button
-                    key={cat.id}
-                    className="topic-card"
-                    onClick={() => openCategoryChat(cat.id, cat.name)}
-                  >
-                    <div className="topic-card__image" aria-hidden="true">
-                      {cat.id === "general-info" && <IdentificationBadge size={28} />}
-                      {cat.id === "womens-health" && <Key size={28} />}
-                      {cat.id === "mens-health" && <Lock size={28} />}
-                      {cat.id === "dermatology" && <MagnifyingGlass size={28} />}
-                      {cat.id === "mental-health" && <ChatCircle size={28} />}
-                      {cat.id === "pediatric-care" && <User size={28} />}
-                      {cat.id === "prescriptions" && <PencilSimple size={28} />}
-                      {cat.id === "insurance" && <ClockCounterClockwise size={28} />}
-                    </div>
-                    <p className="topic-card__title">{cat.name}</p>
-                    <p className="topic-card__desc">{cat.description}</p>
-                  </button>
-                ))}
-              </div>
-            </section>
-          </>
+              )
+            })}
+          </div>
+        )}
+        {conversations.length > 0 && (
+          <div className="hc-articles-tab__history">
+            <HistoryPanel
+              conversations={conversations}
+              onSelect={() => {}}
+              onClear={clearConversations}
+            />
+          </div>
         )}
       </div>
+    )
+  }
 
-      {!popupOpen && (
-        <button
-          className="fab"
-          aria-label="Open support chat"
-          aria-expanded={false}
-          aria-controls="chat-popup"
-          onClick={() => setPopupOpen(true)}
-        >
-          <ChatCircle size={24} aria-hidden="true" />
-        </button>
-      )}
+  // ── Public page ────────────────────────────────────────────────────────────
 
+  function handleViewChange(view: HelpCenterView) {
+    if (view === helpCenterView) return
+    setHelpCenterView(view)
+    setPopupOpen(false)
+    setActiveTab("conversation")
+    setThreadActive(false)
+    setMessages([])
+    setViewingArticle(null)
+    setSearchQuery("")
+    setSearchResults([])
+  }
+
+  function renderPublicPage() {
+    const isBusinessView = helpCenterView === "business"
+
+    return (
+      <div className="hc-page">
+        <header className="hc-header">
+          <div className="hc-header__logo">MDlive</div>
+          <nav className="hc-header__nav" aria-label="Help Center audience">
+            <HelpCenterSwitcher
+              currentView={helpCenterView}
+              onViewChange={handleViewChange}
+            />
+          </nav>
+        </header>
+
+        <section className="hc-hero">
+          <div className="hc-hero__eyebrow">
+            {isBusinessView ? "For organizations" : "For patients"}
+          </div>
+          <h1 className="hc-hero__title">
+            {isBusinessView
+              ? "Business support, all in one place"
+              : "How can we help you?"}
+          </h1>
+          <p className="hc-hero__sub">
+            {isBusinessView
+              ? "Find guidance for benefits, implementation, reporting, and partner support"
+              : "Search our Help Center or chat with us"}
+          </p>
+          <div className="hc-hero__search-wrap">
+            <input
+              className="hc-hero__search"
+              placeholder={
+                isBusinessView
+                  ? "Search business support..."
+                  : "Search for answers..."
+              }
+              onFocus={() => {
+                setPopupOpen(true)
+                setActiveTab("articles")
+              }}
+            />
+            <button className="hc-hero__search-btn">Search</button>
+          </div>
+        </section>
+
+        <section className="hc-categories">
+          <h2 className="hc-categories__title">
+            {isBusinessView ? "Business support topics" : "Browse by category"}
+          </h2>
+          <div className="hc-categories__grid">
+            {isBusinessView
+              ? BUSINESS_TOPICS.map((topic) => {
+                  const TopicIcon = topic.icon
+                  return (
+                    <button
+                      key={topic.id}
+                      className="hc-topic-card"
+                      onClick={() => {
+                        setPopupOpen(true)
+                        setActiveTab("conversation")
+                        handleBusinessTopic(topic)
+                      }}
+                    >
+                      <span className="hc-topic-card__icon">
+                        <TopicIcon size={25} aria-hidden="true" />
+                      </span>
+                      <span className="hc-topic-card__label">{topic.label}</span>
+                      <span className="hc-topic-card__description">
+                        {topic.description}
+                      </span>
+                    </button>
+                  )
+                })
+              : KB_CATEGORIES.map((cat) => (
+                  <button
+                    key={cat}
+                    className="hc-topic-card"
+                    onClick={() => {
+                      setPopupOpen(true)
+                      handleCategory(cat)
+                    }}
+                  >
+                    <span className="hc-topic-card__icon">
+                      <CategoryIcon category={cat} size={25} />
+                    </span>
+                    <span className="hc-topic-card__label">
+                      {categoryLabel(cat)}
+                    </span>
+                  </button>
+                ))}
+          </div>
+        </section>
+        <footer className="hc-footer">
+          <span>
+            MDlive {isBusinessView ? "Business" : "Patient"} Help Center
+            prototype
+          </span>
+          <span className="hc-footer__version">Version {packageJson.version}</span>
+        </footer>
+      </div>
+    )
+  }
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+
+  return (
+    <div className="hc-root hc-root--canvas">
+      <CanvasTopbar
+        currentScenario={currentScenario}
+        onScenarioChange={(scenario) => {
+          setCurrentScenario(scenario)
+          setKbLoaded(false)
+          setArticles([])
+        }}
+        mode={canvasMode}
+        onModeChange={setCanvasMode}
+      />
+
+      {renderPublicPage()}
+
+      {/* FAB */}
+      <button
+        className={`hc-fab ${popupOpen ? "hc-fab--open" : ""}`}
+        onClick={() => setPopupOpen((v) => !v)}
+        aria-label="Chat with us"
+      >
+        {popupOpen ? (
+          <X size={21} weight="bold" aria-hidden="true" />
+        ) : (
+          <ChatCircle size={24} weight="regular" aria-hidden="true" />
+        )}
+      </button>
+
+      {/* Chat popup */}
       {popupOpen && (
-        <div className={`chat-popup${isFullscreen ? " is-fullscreen" : ""}${canvasMode ? " is-canvas-mode" : ""}`} id="chat-popup" role="dialog" aria-label="Support assistant">
-          <div className="chat-popup__toolbar">
-            {threadActive && (
-              <button className="chat-popup__back" aria-label="Back to main menu" onClick={handleBack}>
-                <ArrowLeft size={16} aria-hidden="true" />
-              </button>
-            )}
-            <div className="chat-popup__toolbar-actions">
-              <button aria-label="New chat" onClick={handleReset}>
-                <PencilSimple size={16} />
+        <div
+          className={`hc-popup ${isFullscreen ? "hc-popup--fullscreen" : ""}`}
+        >
+          {/* Popup toolbar */}
+          <div className="hc-popup__toolbar">
+            <div className="hc-popup__toolbar-title">
+              {helpCenterView === "business"
+                ? "MDlive Business Help"
+                : "MDlive Help"}
+            </div>
+            <div className="hc-popup__toolbar-actions">
+              <button
+                className="hc-icon-btn"
+                title={isFullscreen ? "Collapse" : "Expand"}
+                onClick={() => setIsFullscreen((v) => !v)}
+                aria-label={isFullscreen ? "Collapse chat" : "Expand chat"}
+              >
+                {isFullscreen ? (
+                  <ArrowsIn size={17} aria-hidden="true" />
+                ) : (
+                  <ArrowsOut size={17} aria-hidden="true" />
+                )}
               </button>
               <button
-                aria-label="History"
-                onClick={() => {
-                  setActiveTab("articles");
-                  setSelectedArticle(null);
-                }}
+                className="hc-icon-btn"
+                onClick={() => setPopupOpen(false)}
+                title="Close"
+                aria-label="Close chat"
               >
-                <ClockCounterClockwise size={16} />
-              </button>
-              <button
-                aria-label={isFullscreen ? "Exit full screen" : "Expand to full screen"}
-                aria-pressed={isFullscreen}
-                onClick={toggleFullscreen}
-              >
-                {isFullscreen ? <ArrowsIn size={16} /> : <ArrowsOut size={16} />}
-              </button>
-              <button aria-label="Close chat" onClick={handleClose}>
-                <X size={16} />
+                <X size={17} aria-hidden="true" />
               </button>
             </div>
           </div>
 
-          <div className="chat-tabs" role="tablist">
+          {/* Tabs */}
+          <div className="hc-popup__tabs">
             <button
-              role="tab"
-              aria-selected={activeTab === "conversation"}
-              className={`chat-tab ${activeTab === "conversation" ? "active" : ""}`}
+              className={`hc-tab ${
+                activeTab === "conversation" ? "hc-tab--active" : ""
+              }`}
               onClick={() => setActiveTab("conversation")}
             >
               Conversation
             </button>
             <button
-              role="tab"
-              aria-selected={activeTab === "articles"}
-              className={`chat-tab ${activeTab === "articles" ? "active" : ""}`}
+              className={`hc-tab ${
+                activeTab === "articles" ? "hc-tab--active" : ""
+              }`}
               onClick={() => setActiveTab("articles")}
             >
               Articles
             </button>
           </div>
 
-          {activeTab === "conversation" && !threadActive && (
-            <div className="chat-popup__greeting">
-              <div className="logo-placeholder logo-placeholder--sm" aria-hidden="true">
-                <Sparkle size={18} />
-              </div>
-              <p className="chat-popup__greeting-title">Hi, How Can I Help?</p>
-              <p className="chat-popup__legal">By using this service, you agree to the AI terms.</p>
+          {/* Tab content */}
+          <div className="hc-popup__body">
+            {activeTab === "conversation"
+              ? renderConversationTab()
+              : renderArticlesTab()}
+          </div>
 
-              {isLoading ? (
-                <p style={{ textAlign: "center", color: "#9a9a9a" }}>Loading knowledge base...</p>
-              ) : (
-                <div className="entry-menu">
-                  <button className="entry-menu-btn" onClick={askMDLive}>
-                    <Headset size={16} aria-hidden="true" />
-                    <span>Ask MD Live</span>
-                  </button>
-                  <button
-                    className="entry-menu-btn"
-                    onClick={() => showCategoryArticles("general-info", "Popular Topics")}
-                  >
-                    <Sparkle size={16} aria-hidden="true" />
-                    <span>Popular Topics</span>
-                  </button>
-                  <button className="entry-menu-btn" onClick={showConditionsMenu}>
-                    <Stethoscope size={16} aria-hidden="true" />
-                    <span>Ask about conditions</span>
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeTab === "conversation" && threadActive && (
-            <div className="thread" ref={threadRef} aria-live="polite">
-              {messages.map((msg) => {
-                if (msg.who === "user")
-                  return (
-                    <div key={msg.id} className="msg-row msg-row--user">
-                      <div className="msg-bubble msg-bubble--user">{msg.text}</div>
-                    </div>
-                  );
-                if (msg.who === "typing")
-                  return (
-                    <div key={msg.id} className="msg-row msg-row--bot">
-                      <div className="msg-avatar" aria-hidden="true">
-                        <Sparkle size={12} />
-                      </div>
-                      <div className="msg-bubble msg-bubble--bot msg-bubble--typing">...</div>
-                    </div>
-                  );
-                return (
-                  <div key={msg.id} className="msg-row msg-row--bot">
-                    <div className="msg-avatar" aria-hidden="true">
-                      <Sparkle size={12} />
-                    </div>
-                    <div className="msg-content">
-                      {msg.text && <div className="msg-bubble msg-bubble--bot">{msg.text}</div>}
-                      {msg.article && (
-                        <div className="article-card">
-                          <div className="article-card__breadcrumb">
-                            <span>MDLIVE</span>
-                            <span aria-hidden="true">·</span>
-                            <span>Articles</span>
-                          </div>
-                          <div className="article-card__thumb" aria-hidden="true">
-                            <FileText size={26} />
-                          </div>
-                          <div className="article-card__body">
-                            <p className="article-card__title">{msg.article.title}</p>
-                            <p className="article-card__desc">{excerpt(msg.article.content)}</p>
-                            <div className="article-card__byline">
-                              <span>MDLIVE Care Team</span>
-                              <span aria-hidden="true">·</span>
-                              <span>{readTime(msg.article.content)} min read</span>
-                            </div>
-                            <button
-                              className="article-card__cta"
-                              onClick={() => openArticle(msg.article!)}
-                            >
-                              View article
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                      {msg.chips && msg.chips.length > 0 && (
-                        <div className="chip-row">
-                          {msg.chips.map((c) => (
-                            <button key={c.key} className="chip-btn" onClick={c.onClick}>
-                              {c.label}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {activeTab === "articles" && (
-            <div className="chat-popup__greeting articles-panel">
-              {selectedArticle ? (
-                <div className="article-viewer">
-                  <button className="back-link" onClick={() => setSelectedArticle(null)}>
-                    <ArrowLeft size={12} aria-hidden="true" />
-                    All articles
-                  </button>
-                  <h3>{selectedArticle.title}</h3>
-                  <div className="article-content">
-                    {selectedArticle.content.split("\n").map((line, i) => (
-                      <p key={i}>{line}</p>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="history-panel">
-                  <div className="history-section">
-                    <p className="history-section__label">Saved Conversations</p>
-                    {savedConversations.length === 0 ? (
-                      <p className="history-empty">No saved conversations yet.</p>
-                    ) : (
-                      savedConversations.map((c) => (
-                        <button
-                          key={c.id}
-                          className="history-item"
-                          onClick={() => {
-                            const a = articles.find((x) => x.id === c.articleId);
-                            if (a) setSelectedArticle(a);
-                          }}
-                        >
-                          <ChatCircle size={16} aria-hidden="true" />
-                          <span className="history-item__body">
-                            <span className="history-item__title">{c.title}</span>
-                            <span className="history-item__meta">{formatTimestamp(c.timestamp)}</span>
-                          </span>
-                        </button>
-                      ))
-                    )}
-                  </div>
-                  <div className="history-section">
-                    <p className="history-section__label">Recent Search</p>
-                    {recentSearches.length === 0 ? (
-                      <p className="history-empty">No recent searches yet.</p>
-                    ) : (
-                      recentSearches.map((q) => (
-                        <button
-                          key={q}
-                          className="history-item history-item--search"
-                          onClick={() => ask(q)}
-                        >
-                          <MagnifyingGlass size={14} aria-hidden="true" />
-                          <span>{q}</span>
-                        </button>
-                      ))
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeTab === "conversation" && (
-            <div className="composer">
+          {/* Composer (only in conversation tab when thread is active and no article is showing) */}
+          {activeTab === "conversation" && threadActive && !viewingArticle && (
+            <div className="hc-composer">
               <input
-                className="composer__input"
                 ref={composerRef}
-                type="text"
-                placeholder="Ask a question..."
-                aria-label="Ask a question"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleComposerKey}
+                className="hc-composer__input"
+                placeholder="Type a question..."
+                value={composerValue}
+                onChange={(e) => setComposerValue(e.target.value)}
+                onKeyDown={handleKeyDown}
+                disabled={isTyping}
               />
-              <button className="btn-circle btn-circle--sm" aria-label="Send" onClick={handleSend}>
-                <PaperPlaneTilt size={14} />
+              <button
+                className="hc-composer__send"
+                onClick={handleSubmit}
+                disabled={!composerValue.trim() || isTyping}
+                aria-label="Send"
+              >
+                <PaperPlaneTilt size={18} weight="fill" aria-hidden="true" />
               </button>
             </div>
           )}
         </div>
       )}
     </div>
-  );
+  )
 }
