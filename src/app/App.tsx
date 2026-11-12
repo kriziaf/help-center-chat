@@ -28,7 +28,7 @@ import {
   type Icon,
 } from "@phosphor-icons/react"
 import packageJson from "../../package.json"
-import { SCENARIOS, type ScenarioType } from "../config/scenarios"
+import { SCENARIOS, runSearch, type ScenarioType } from "../config/scenarios"
 import { SMART_FLOW, type SmartNode } from "../config/smartFlow"
 import { CONDITIONS } from "../config/conditionsFlow"
 import { fetchArticles, searchArticles } from "../utils/kb"
@@ -824,7 +824,7 @@ export default function App() {
       return
     }
     const scenario = SCENARIOS[currentScenario]
-    const results = scenario.searchMock(searchQuery, articles)
+    const results = runSearch(scenario.search, searchQuery, articles)
     setSearchResults(results)
   }, [searchQuery, articles, currentScenario, helpCenterView])
 
@@ -977,7 +977,7 @@ export default function App() {
         return
       }
 
-      const results = scenario.searchMock(query, articles)
+      const results = runSearch(scenario.search, query, articles)
 
       if (results.length === 0) {
         replaceLoadingMsg(loadingId, {

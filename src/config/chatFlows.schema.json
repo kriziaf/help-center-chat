@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "smartFlow": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "text": {
+            "type": "string",
+            "description": "What the bot says."
+          },
+          "chips": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Unique within its node."
+                },
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Text the user sees and effectively sends."
+                },
+                "goTo": {
+                  "description": "Id of another node in the same tree.",
+                  "type": "string",
+                  "minLength": 1
+                },
+                "articleId": {
+                  "description": "KB article id: the filename without .md.",
+                  "type": "string",
+                  "minLength": 1
+                },
+                "action": {
+                  "description": "App-level escape hatch.",
+                  "type": "string",
+                  "enum": [
+                    "reset",
+                    "learn-more",
+                    "category:pediatric-care",
+                    "blog-placeholder"
+                  ]
+                }
+              },
+              "required": [
+                "key",
+                "label"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "id",
+          "text"
+        ],
+        "additionalProperties": false
+      },
+      "description": "Hand-written scripted flow (Ask MD Live, Women's Health)."
+    },
+    "conditions": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "text": {
+            "type": "string",
+            "description": "What the bot says."
+          },
+          "chips": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Unique within its node."
+                },
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Text the user sees and effectively sends."
+                },
+                "goTo": {
+                  "description": "Id of another node in the same tree.",
+                  "type": "string",
+                  "minLength": 1
+                },
+                "articleId": {
+                  "description": "KB article id: the filename without .md.",
+                  "type": "string",
+                  "minLength": 1
+                },
+                "action": {
+                  "description": "App-level escape hatch.",
+                  "type": "string",
+                  "enum": [
+                    "reset",
+                    "learn-more",
+                    "category:pediatric-care",
+                    "blog-placeholder"
+                  ]
+                }
+              },
+              "required": [
+                "key",
+                "label"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "id",
+          "text"
+        ],
+        "additionalProperties": false
+      },
+      "description": "Generated flow for 'Ask about conditions'."
+    }
+  },
+  "required": [
+    "smartFlow",
+    "conditions"
+  ],
+  "additionalProperties": false
+}
