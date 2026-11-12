@@ -29,7 +29,8 @@ import {
 } from "@phosphor-icons/react"
 import packageJson from "../../package.json"
 import { SCENARIOS, type ScenarioType } from "../config/scenarios"
-import { SMART_FLOW, CONDITIONS, type SmartNode } from "../config/smartFlow"
+import { SMART_FLOW, type SmartNode } from "../config/smartFlow"
+import { CONDITIONS } from "../config/conditionsFlow"
 import { fetchArticles, searchArticles } from "../utils/kb"
 
 // ─── Types ───────────────────────────────────────────────────────────────────
