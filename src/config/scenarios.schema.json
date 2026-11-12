@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Unique scenario id. Matches the key in SCENARIOS."
+      },
+      "name": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Label shown in the scenario dropdown."
+      },
+      "description": {
+        "type": "string",
+        "description": "What this scenario tests."
+      },
+      "delay": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 9007199254740991,
+        "description": "Artificial response delay in milliseconds."
+      },
+      "kbAvailable": {
+        "type": "boolean",
+        "description": "Whether the knowledge base loads in this scenario."
+      },
+      "search": {
+        "type": "string",
+        "enum": [
+          "normal",
+          "none",
+          "malformed"
+        ],
+        "description": "How search behaves: normal, none, or malformed."
+      }
+    },
+    "required": [
+      "id",
+      "name",
+      "description",
+      "delay",
+      "kbAvailable",
+      "search"
+    ],
+    "additionalProperties": false
+  },
+  "description": "Test scenarios for the Help Center chat."
+}

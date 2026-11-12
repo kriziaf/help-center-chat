@@ -1,0 +1,50 @@
+[
+  {
+    "id": "default",
+    "name": "Scenario A: Default",
+    "description": "Normal KB search, real articles",
+    "delay": 700,
+    "kbAvailable": true,
+    "search": "normal"
+  },
+  {
+    "id": "error",
+    "name": "Scenario B: Error Path",
+    "description": "No results found",
+    "delay": 700,
+    "kbAvailable": true,
+    "search": "none"
+  },
+  {
+    "id": "slow",
+    "name": "Scenario C: Slow Response",
+    "description": "Slow network, test loading state",
+    "delay": 2500,
+    "kbAvailable": true,
+    "search": "normal"
+  },
+  {
+    "id": "kbFailure",
+    "name": "Scenario D: KB Load Failure",
+    "description": "KB unavailable, system error",
+    "delay": 1000,
+    "kbAvailable": false,
+    "search": "none"
+  },
+  {
+    "id": "multiple",
+    "name": "Scenario E: Multiple Results",
+    "description": "Show 5 articles, test ranking",
+    "delay": 700,
+    "kbAvailable": true,
+    "search": "normal"
+  },
+  {
+    "id": "malformed",
+    "name": "Scenario F: Partial/Malformed",
+    "description": "Articles with missing data",
+    "delay": 700,
+    "kbAvailable": true,
+    "search": "malformed"
+  }
+]
