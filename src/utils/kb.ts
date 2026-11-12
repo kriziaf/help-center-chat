@@ -1,197 +1,130 @@
-import { readFileSync } from 'fs';
-import { join } from 'path';
+import type { Article } from "../app/App"
 
-export interface Article {
-  id: string;
-  title: string;
-  category: string;
-  tags: string[];
-  content: string;
-  fileName: string;
-  questions: string[];
+export interface KBIndex {
+  category: string
+  articles: { file: string; title: string }[]
 }
 
-export interface Category {
-  id: string;
-  name: string;
-  description: string;
-  articles: number;
-}
+export function parseFrontmatter(
+  raw: string,
+): {
+  frontmatter: Record<string, string | string[]>
+  body: string
+} {
+  const match = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/)
+  if (!match) return { frontmatter: {}, body: raw }
 
-export interface KBSchema {
-  version: string;
-  schema: string;
-  lastUpdated: string;
-  stats: {
-    totalArticles: number;
-    totalQAPairs: number;
-    totalCategories: number;
-    totalUniqueTags: number;
-  };
-  categories: Category[];
-  tags: Array<{ name: string; count: number }>;
-  articles: Array<{ id: string; title: string; category: string; questions: number; tags: string[] }>;
-}
+  const fm: Record<string, string | string[]> = {}
+  const lines = match[1].split("\n")
+  let currentKey = ""
+  let inList = false
+  const listValues: string[] = []
 
-// Parse markdown frontmatter
-function parseFrontmatter(content: string): { frontmatter: Record<string, any>; body: string } {
-  const match = content.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
-  if (!match) return { frontmatter: {}, body: content };
-
-  const frontmatterStr = match[1];
-  const body = match[2];
-
-  const frontmatter: Record<string, any> = {};
-  frontmatterStr.split('\n').forEach((line) => {
-    const [key, ...value] = line.split(':');
-    if (key && value.length > 0) {
-      const trimmedKey = key.trim();
-      let trimmedValue = value.join(':').trim();
-
-      // Handle YAML arrays
-      if (trimmedValue.startsWith('[') && trimmedValue.endsWith(']')) {
-        trimmedValue = trimmedValue.slice(1, -1);
-        frontmatter[trimmedKey] = trimmedValue
-          .split(',')
-          .map((v) => v.trim().replace(/^["']|["']$/g, ''));
+  for (const line of lines) {
+    if (line.startsWith("  - ") && inList) {
+      listValues.push(line.slice(4).trim())
+    } else if (line.match(/^[a-zA-Z_]+:/)) {
+      if (inList && currentKey) {
+        fm[currentKey] = [...listValues]
+        listValues.length = 0
+      }
+      const colonIdx = line.indexOf(":")
+      const key = line.slice(0, colonIdx).trim()
+      const val = line.slice(colonIdx + 1).trim()
+      if (val === "") {
+        inList = true
+        currentKey = key
       } else {
-        // Remove quotes if present
-        frontmatter[trimmedKey] = trimmedValue.replace(/^["']|["']$/g, '');
+        inList = false
+        currentKey = key
+        fm[key] = val.replace(/^["']|["']$/g, "")
       }
     }
-  });
-
-  return { frontmatter, body };
-}
-
-// Extract questions from markdown (H2 headings)
-function extractQuestions(content: string): string[] {
-  const questionRegex = /^## (.+)$/gm;
-  const questions: string[] = [];
-  let match;
-  while ((match = questionRegex.exec(content)) !== null) {
-    questions.push(match[1].trim());
   }
-  return questions;
+  if (inList && currentKey) {
+    fm[currentKey] = [...listValues]
+  }
+
+  return { frontmatter: fm, body: match[2] }
 }
 
-// Load KB from public directory (for client-side bundling)
-export async function loadKnowledgeBase(): Promise<Article[]> {
-  const articles: Article[] = [];
-
-  // Categories to load
-  const categories = [
-    'general-info',
-    'womens-health',
-    'mens-health',
-    'dermatology',
-    'mental-health',
-    'pediatric-care',
-    'prescriptions',
-    'insurance',
-  ];
-
-  // This would be fetched in the browser from /kb/
-  // For now, we'll return an empty array and handle it client-side
-  return articles;
+export function extractQuestions(body: string): string[] {
+  const lines = body.split("\n")
+  const qs: string[] = []
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (trimmed.endsWith("?") && trimmed.length < 200) {
+      qs.push(trimmed.replace(/^#+\s*/, ""))
+    }
+  }
+  return qs
 }
 
-// Client-side KB loading (will fetch markdown files)
-export async function fetchArticles(): Promise<Article[]> {
-  const articles: Article[] = [];
-  const categories = [
-    'general-info',
-    'womens-health',
-    'mens-health',
-    'dermatology',
-    'mental-health',
-    'pediatric-care',
-    'prescriptions',
-    'insurance',
-  ];
+export async function fetchArticles(categories: string[]): Promise<Article[]> {
+  const articles: Article[] = []
 
-  for (const category of categories) {
+  for (const cat of categories) {
     try {
-      const response = await fetch(`/kb-index-${category}.json`);
-      if (response.ok) {
-        const files = await response.json();
-        for (const fileName of files) {
-          const fileResponse = await fetch(`/${category}/${fileName}`);
-          if (fileResponse.ok) {
-            const content = await fileResponse.text();
-            const { frontmatter, body } = parseFrontmatter(content);
-            const questions = extractQuestions(body);
+      const indexRes = await fetch(`/kb-index-${cat}.json`)
+      if (!indexRes.ok) continue
+      const index: KBIndex = await indexRes.json()
 
-            articles.push({
-              id: fileName.replace('.md', ''),
-              title: frontmatter.title || fileName,
-              category: frontmatter.category || category,
-              tags: frontmatter.tags || [],
-              content: body,
-              fileName,
-              questions,
-            });
-          }
+      for (const entry of index.articles) {
+        try {
+          const mdRes = await fetch(`/${cat}/${entry.file}`)
+          if (!mdRes.ok) continue
+          const raw = await mdRes.text()
+          const { frontmatter, body } = parseFrontmatter(raw)
+
+          const tagsRaw = frontmatter.tags
+          const tags = Array.isArray(tagsRaw)
+            ? tagsRaw
+            : typeof tagsRaw === "string"
+              ? tagsRaw.split(",").map((t) => t.trim())
+              : []
+
+          articles.push({
+            id: entry.file.replace(/\.md$/, ""),
+            title: frontmatter.title as string || entry.title,
+            category: cat,
+            tags,
+            questions: extractQuestions(body),
+            content: body,
+          })
+        } catch {
+          // Skip individual article failures
         }
       }
-    } catch (error) {
-      console.error(`Error loading KB for category ${category}:`, error);
+    } catch {
+      // Skip category failures
     }
   }
 
-  return articles;
+  return articles
 }
 
-// Get articles by category
-export function getArticlesByCategory(articles: Article[], category: string): Article[] {
-  return articles.filter((a) => a.category === category);
-}
-
-// Get articles by tag
-export function getArticlesByTag(articles: Article[], tag: string): Article[] {
-  return articles.filter((a) => a.tags.includes(tag));
-}
-
-// Search articles by keyword
-export function searchArticles(articles: Article[], query: string): Article[] {
-  const keywords = query.toLowerCase().split(/\s+/);
+export function searchArticles(query: string, articles: Article[]): Article[] {
+  if (!query.trim()) return []
+  const keywords = query.toLowerCase().split(/\s+/)
   const scored = articles.map((article) => {
-    let score = 0;
+    let score = 0
     keywords.forEach((kw) => {
-      if (article.title.toLowerCase().includes(kw)) score += 3;
-      if (article.tags.some((t) => t.includes(kw))) score += 2;
-      if (article.content.toLowerCase().includes(kw)) score += 1;
-      if (article.questions.some((q) => q.toLowerCase().includes(kw))) score += 2;
-    });
-    return { article, score };
-  });
+      if (article.title.toLowerCase().includes(kw)) score += 3
+      if (article.tags.some((t) => t.toLowerCase().includes(kw))) score += 2
+      if (article.questions.some((q) => q.toLowerCase().includes(kw)))
+        score += 2
+      if (article.content.toLowerCase().includes(kw)) score += 1
+    })
+    return { article, score }
+  })
 
   return scored
     .filter((s) => s.score > 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, 5)
-    .map((s) => s.article);
+    .map((s) => s.article)
 }
 
-// Get all unique tags
-export function getAllTags(articles: Article[]): string[] {
-  const tagSet = new Set<string>();
-  articles.forEach((a) => {
-    a.tags.forEach((tag) => tagSet.add(tag));
-  });
-  return Array.from(tagSet).sort();
-}
-
-// Get categories
-export function getCategories(): Category[] {
-  return [
-    { id: 'general-info', name: 'General Info', description: 'Service overview & setup', articles: 3 },
-    { id: 'womens-health', name: "Women's Health", description: 'Women health & wellness', articles: 3 },
-    { id: 'mens-health', name: "Men's Health", description: 'Men health & wellness', articles: 3 },
-    { id: 'dermatology', name: 'Dermatology', description: 'Skin care services', articles: 4 },
-    { id: 'mental-health', name: 'Mental Health', description: 'Therapy & psychiatry', articles: 2 },
-    { id: 'pediatric-care', name: 'Pediatric Care', description: 'Children health services', articles: 5 },
-    { id: 'prescriptions', name: 'Prescriptions', description: 'Medications & prescriptions', articles: 1 },
-    { id: 'insurance', name: 'Insurance', description: 'Coverage & billing', articles: 3 },
-  ];
+export function getCategories(articles: Article[]): string[] {
+  return [...new Set(articles.map((a) => a.category))]
 }
